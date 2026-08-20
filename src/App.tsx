@@ -1,10 +1,15 @@
 export default function App() {
   return (
-    <main className="grid min-h-dvh place-items-center bg-zinc-950 text-zinc-100">
+    <main className="grid min-h-dvh place-items-center bg-canvas text-ink">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Classroom</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Scaffold only. The shell arrives in step 3.
+        <h1 className="text-3xl font-semibold tracking-tight">
+          <span className="vsdk-wordmark">
+            video<span className="sdk">sdk</span>
+          </span>{' '}
+          Classroom
+        </h1>
+        <p className="mt-2 text-base text-ink-secondary">
+          Design system vendored. The shell arrives in step 3.
         </p>
       </div>
     </main>

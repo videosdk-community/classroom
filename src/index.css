@@ -151,6 +151,13 @@
     color: var(--on-primary);
   }
 
+  /* Spinner keyframes - here rather than an inline <style> per instance. */
+  @keyframes vsdk-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   /* Brand wordmark - IBM Plex Sans, with a lighter "sdk". Wordmark only;
      IBM Plex Sans is never used for product UI. */
   .vsdk-wordmark {

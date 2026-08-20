@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { Classroom } from './screens/Classroom'
 import { LiveClassroom } from './screens/LiveClassroom'
-import { RoomProvider, devSession } from './sdk'
+import { Precall } from './screens/Precall'
+import { RoomProvider, devSession, type PrecallTracks } from './sdk'
 import type { ClassMode } from './fixtures/classroom'
 
 /* Routes.
@@ -44,13 +46,50 @@ function LiveRoute() {
     )
   }
 
+  return <PrecallThenRoom mode={mode} meetingId={dev.meetingId} token={dev.token} />
+}
+
+interface Joined {
+  tracks: PrecallTracks
+  micOn: boolean
+  camOn: boolean
+}
+
+/* Precall and the room are SIBLINGS, never nested.
+
+   MeetingProvider reads its config on first mount and ignores later changes -
+   reinitialiseMeetingOnConfigChange defaults to false - so precall tracks only
+   take effect if they exist before the provider mounts. Rendering precall
+   inside a mounted provider would make the handoff a silent no-op and send
+   someone hunting through the SDK for a bug that is in the tree shape. */
+function PrecallThenRoom({
+  mode,
+  meetingId,
+  token,
+}: {
+  mode: ClassMode
+  meetingId: string
+  token: string
+}) {
+  const [joined, setJoined] = useState<Joined | null>(null)
+
+  if (!joined) {
+    return (
+      <Precall
+        onJoin={(tracks, micOn, camOn) => setJoined({ tracks, micOn, camOn })}
+      />
+    )
+  }
+
   return (
     <RoomProvider
-      meetingId={dev.meetingId}
-      token={dev.token}
+      meetingId={meetingId}
+      token={token}
       name="Teacher"
-      micEnabled
-      camEnabled
+      micEnabled={joined.micOn}
+      camEnabled={joined.camOn}
+      customCameraVideoTrack={joined.tracks.camera}
+      customMicrophoneAudioTrack={joined.tracks.microphone}
     >
       <LiveClassroom mode={mode} />
     </RoomProvider>

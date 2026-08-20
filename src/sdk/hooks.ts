@@ -1,0 +1,110 @@
+import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react'
+import type { RoomStore } from './store'
+import type { ParticipantView, RoomMessage, RoomSnapshot } from './types'
+
+export const RoomStoreContext = createContext<RoomStore | null>(null)
+
+export function useRoomStore(): RoomStore {
+  const store = useContext(RoomStoreContext)
+  if (!store) throw new Error('useRoomStore must be used inside <RoomProvider>')
+  return store
+}
+
+/* The selector hook.
+
+   useSyncExternalStore has no selector argument, and the naive wrapper
+   `useSyncExternalStore(sub, () => select(getSnapshot()))` recreates the
+   selected value on every call and loops forever. Two things prevent that:
+   the store guarantees reference stability for anything already inside the
+   snapshot, and this cache keys on the store's version counter so a derived
+   value is computed at most once per commit and keeps its old reference when
+   equal.
+
+   Every call site below passes a MODULE-LEVEL selector constant, never an
+   inline arrow. With stable identities the dependency list never fires, so
+   `get` is built once; an inline arrow would rebuild it every render and
+   defeat the cache. That discipline is enforced structurally rather than by
+   convention: useSelector is not exported from index.ts, so no feature
+   component can pass one. */
+function useSelector<T>(select: (s: RoomSnapshot) => T, isEqual: (a: T, b: T) => boolean = Object.is): T {
+  const store = useRoomStore()
+  const cache = useRef<{ version: number; value: T } | null>(null)
+
+  const get = useCallback(() => {
+    const version = store.getVersion()
+    if (cache.current && cache.current.version === version) return cache.current.value
+
+    const next = select(store.getSnapshot())
+    if (cache.current && isEqual(cache.current.value, next)) {
+      /* Keep the OLD reference. Returning a new-but-equal object here is
+         exactly the loop this cache exists to prevent. */
+      cache.current = { version, value: cache.current.value }
+      return cache.current.value
+    }
+    cache.current = { version, value: next }
+    return next
+  }, [store, select, isEqual])
+
+  return useSyncExternalStore(store.subscribe, get, get)
+}
+
+function arrayEqual<T>(a: readonly T[], b: readonly T[]) {
+  return a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+}
+
+const EMPTY: readonly RoomMessage[] = []
+
+// Module-level selectors, so nothing captures a fresh closure per render.
+const selStatus = (s: RoomSnapshot) => s.status
+const selLocalId = (s: RoomSnapshot) => s.localId
+const selIds = (s: RoomSnapshot) => s.participantIds
+const selRecording = (s: RoomSnapshot) => s.isRecording
+const selWhiteboard = (s: RoomSnapshot) => s.whiteboard
+const selEntryQueue = (s: RoomSnapshot) => s.entryQueue
+const selEntryDecision = (s: RoomSnapshot) => s.lastEntryDecision
+const selError = (s: RoomSnapshot) => s.lastError
+
+export const useRoomStatus = () => useSelector(selStatus)
+export const useLocalId = () => useSelector(selLocalId)
+export const useParticipantIds = () => useSelector(selIds, arrayEqual)
+export const useIsRecording = () => useSelector(selRecording)
+export const useWhiteboard = () => useSelector(selWhiteboard)
+export const useEntryQueue = () => useSelector(selEntryQueue, arrayEqual)
+export const useEntryDecision = () => useSelector(selEntryDecision)
+export const useRoomError = () => useSelector(selError)
+
+/** One participant. The store gives these reference identity, so this is a
+    plain read and needs no equality function. */
+export function useParticipantView(id: string): ParticipantView | undefined {
+  const store = useRoomStore()
+  const get = useCallback(() => store.getSnapshot().participants[id], [store, id])
+  return useSyncExternalStore(store.subscribe, get, get)
+}
+
+export function useTopic(topic: string): readonly RoomMessage[] {
+  const store = useRoomStore()
+  const get = useCallback(() => store.getSnapshot().topics[topic] ?? EMPTY, [store, topic])
+  return useSyncExternalStore(store.subscribe, get, get)
+}
+
+/** The imperative surface. Stable for the life of the provider. */
+export function useRoomActions() {
+  const store = useRoomStore()
+  const actions = store.getActions()
+  if (!actions) throw new Error('Room actions are not registered yet')
+  return actions
+}
+
+/** Live media for one participant, from the non-reactive registry. */
+export function useTrack(id: string, kind: 'mic' | 'cam') {
+  const store = useRoomStore()
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      store.subscribeTracks((changed) => {
+        if (changed === id) onChange()
+      }),
+    [store, id],
+  )
+  const get = useCallback(() => store.getTrack(id, kind), [store, id, kind])
+  return useSyncExternalStore(subscribe, get, get)
+}

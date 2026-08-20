@@ -1,3 +1,4 @@
+import { warn } from './log'
 import type {
   EntryDecision,
   EntryRequest,
@@ -75,6 +76,46 @@ export function createRoomStore() {
   const trackListeners = new Set<(id: string) => void>()
 
   let actions: RoomActions | null = null
+
+  /* A stable facade, built once and handed to every consumer.
+
+     The bridges register their real implementations in effects, and React
+     flushes a parent's effects AFTER its children have rendered - so a child
+     calling useRoomActions during the first commit would find nothing there.
+     Returning the live object would also change identity every time a bridge
+     re-registered, defeating every memo downstream.
+
+     So consumers get this, forever. Each method resolves the current
+     implementation at call time, which is always an event handler and always
+     after the effects have run. */
+  const notReady = (name: string) => () => {
+    warn(`room action "${name}" called before the bridges registered; ignoring`)
+  }
+
+  const facade: RoomActions = {
+    join: () => (actions ? actions.join() : notReady('join')()),
+    leave: () => (actions ? actions.leave() : notReady('leave')()),
+    end: () => (actions ? actions.end() : notReady('end')()),
+    toggleMic: () => (actions ? actions.toggleMic() : notReady('toggleMic')()),
+    toggleWebcam: () => (actions ? actions.toggleWebcam() : notReady('toggleWebcam')()),
+    muteParticipant: (id) =>
+      actions ? actions.muteParticipant(id) : notReady('muteParticipant')(),
+    askToUnmute: (id) => (actions ? actions.askToUnmute(id) : notReady('askToUnmute')()),
+    startWhiteboard: async () => {
+      if (actions) await actions.startWhiteboard()
+      else notReady('startWhiteboard')()
+    },
+    stopWhiteboard: async () => {
+      if (actions) await actions.stopWhiteboard()
+      else notReady('stopWhiteboard')()
+    },
+    respondEntry: (id, allow) =>
+      actions ? actions.respondEntry(id, allow) : notReady('respondEntry')(),
+    publish: async (topic, text, persist) => {
+      if (actions) await actions.publish(topic, text, persist)
+      else notReady('publish')()
+    },
+  }
 
   function emit() {
     version++
@@ -194,7 +235,10 @@ export function createRoomStore() {
     },
 
     setActions: (next: RoomActions) => { actions = next },
+    /* The raw registration, for bridges that extend it. */
     getActions: () => actions,
+    /* What feature code gets: one object, stable for the life of the store. */
+    getActionFacade: () => facade,
 
     reset() {
       snapshot = INITIAL

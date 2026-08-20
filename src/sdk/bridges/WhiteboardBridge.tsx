@@ -6,18 +6,20 @@ import type { RoomStore } from '../store'
    whiteboardUrl. No role, no read-only, no URL params, no events on
    useMeeting. Confirmed against the shipped typings.
 
-   A caution that is NOT in the plan and needs a two-browser probe before
-   anything is built on it: in the bundle, `whiteboardUrl` is plain
-   useState(null) seeded only by the `whiteboard-started` event, with no
-   initial query on join. A participant who joins AFTER the board was started
-   may therefore see null forever. The js-sdk can also emit that event with a
-   {state} payload rather than {url}, which the React hook ignores outright.
+   One concern was raised against this and then PROBED AND RETIRED on
+   2026-08-20, so it does not need re-litigating. Reading the bundle,
+   `whiteboardUrl` is plain useState(null) seeded only by the
+   `whiteboard-started` event with no initial query on join, which suggests a
+   participant joining AFTER the board was started would see null forever.
 
-   If the probe shows late joiners are stranded, the fix is the mechanism
-   DECISIONS.md already blesses for CLASS_CONTROLS: the teacher also publishes
-   the url to a persisted pubsub topic and whichever arrives first wins. The
-   store already carries `url` separately from the actions, so that is an
-   additive change here and nowhere else. */
+   Driven in three browsers rather than reasoned about: the board was started
+   from one, and it appeared both in the participant already in the room and
+   in a third that joined afterwards. The server replays the event on join, so
+   late joiners are fine and no pubsub fallback is needed.
+
+   If that ever regresses, the fix is the mechanism DECISIONS.md already
+   blesses for CLASS_CONTROLS - publish the url to a persisted topic and take
+   whichever arrives first - and it would be additive here and nowhere else. */
 
 export function WhiteboardBridge({ store }: { store: RoomStore }) {
   const { startWhiteboard, stopWhiteboard, whiteboardUrl } = useWhiteboard()

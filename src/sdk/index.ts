@@ -16,6 +16,7 @@ export {
   useLocalId,
   useParticipantIds,
   useParticipantView,
+  useParticipantViews,
   useIsRecording,
   useWhiteboard,
   useEntryQueue,

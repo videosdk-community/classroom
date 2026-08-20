@@ -1,27 +1,67 @@
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { Classroom } from './screens/Classroom'
+import { LiveClassroom } from './screens/LiveClassroom'
+import { RoomProvider, devSession } from './sdk'
 import type { ClassMode } from './fixtures/classroom'
 
 /* Routes.
 
-   Step 3 has one real screen. Mode is a query parameter here purely so both
-   shapes can be looked at without a database behind them; in the shipped app
-   mode is a room column, fixed at creation and read once at join from
-   api/session.ts. There is no mid-class switch, so this switch is scaffolding
-   and goes away in step 6. */
+   Two classroom routes for now, which is a step-4 arrangement and not the
+   shipped shape:
 
-function ClassroomRoute() {
+   /room  fixtures only, no SDK, no network. The step-3 checkpoint screen, and
+          still the fastest way to judge the shell at a window size without
+          burning meeting minutes.
+   /live  the same shell wired to a real meeting.
+
+   Mode is a query param in both, purely so each shape can be looked at without
+   a database. In the shipped app it is a room column read once at join, so the
+   param is scaffolding and goes at step 6 along with /room itself. */
+
+function useMode(): ClassMode {
   const [params] = useSearchParams()
-  const mode: ClassMode = params.get('mode') === 'lecture' ? 'lecture' : 'class'
-  const showKeepout = params.get('keepout') === '1'
+  return params.get('mode') === 'lecture' ? 'lecture' : 'class'
+}
 
-  return <Classroom mode={mode} showKeepout={showKeepout} />
+function FixtureRoute() {
+  const [params] = useSearchParams()
+  return <Classroom mode={useMode()} showKeepout={params.get('keepout') === '1'} />
+}
+
+function LiveRoute() {
+  const mode = useMode()
+  const dev = devSession()
+
+  if (!dev) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
+        <span className="text-xl font-semibold text-ink">No meeting token</span>
+        <span className="max-w-[420px] text-base text-ink-secondary">
+          Run <code className="text-ink">node scripts/mint-dev-token.mjs</code> to create a room and
+          write the dev token, then restart the dev server. Step 6 replaces this with a real session.
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <RoomProvider
+      meetingId={dev.meetingId}
+      token={dev.token}
+      name="Teacher"
+      micEnabled
+      camEnabled
+    >
+      <LiveClassroom mode={mode} />
+    </RoomProvider>
+  )
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/room" element={<ClassroomRoute />} />
+      <Route path="/room" element={<FixtureRoute />} />
+      <Route path="/live" element={<LiveRoute />} />
       <Route path="*" element={<Navigate to="/room" replace />} />
     </Routes>
   )

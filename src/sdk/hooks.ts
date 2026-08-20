@@ -73,6 +73,17 @@ export const useEntryQueue = () => useSelector(selEntryQueue, arrayEqual)
 export const useEntryDecision = () => useSelector(selEntryDecision)
 export const useRoomError = () => useSelector(selError)
 
+/* The roster as an array.
+
+   Derived, so it goes through the version cache: the array is rebuilt at most
+   once per commit and keeps its previous reference when element-wise equal.
+   The elements themselves have stable identity from the store's structural
+   sharing, which is what makes arrayEqual meaningful here rather than a
+   deep-compare in disguise. */
+const selViews = (s: RoomSnapshot) =>
+  s.participantIds.map((id) => s.participants[id]).filter(Boolean)
+export const useParticipantViews = () => useSelector(selViews, arrayEqual)
+
 /** One participant. The store gives these reference identity, so this is a
     plain read and needs no equality function. */
 export function useParticipantView(id: string): ParticipantView | undefined {
@@ -87,12 +98,15 @@ export function useTopic(topic: string): readonly RoomMessage[] {
   return useSyncExternalStore(store.subscribe, get, get)
 }
 
-/** The imperative surface. Stable for the life of the provider. */
+/** The imperative surface. One object, stable for the life of the provider.
+
+    Deliberately not the registered object itself: bridges register in effects,
+    and React flushes a parent's effects after its children render, so reading
+    the real one during the first commit finds nothing. The facade resolves
+    each call at call time instead, which is always an event handler and always
+    after effects have run. */
 export function useRoomActions() {
-  const store = useRoomStore()
-  const actions = store.getActions()
-  if (!actions) throw new Error('Room actions are not registered yet')
-  return actions
+  return useRoomStore().getActionFacade()
 }
 
 /** Live media for one participant, from the non-reactive registry. */

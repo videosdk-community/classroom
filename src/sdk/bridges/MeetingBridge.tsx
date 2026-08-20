@@ -139,10 +139,20 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
   /* Local participant is declared non-optional by the .d.ts but is undefined
      before join, so it is read defensively rather than eagerly. */
   const localId = meeting.localParticipant?.id ?? null
+  const localName = meeting.localParticipant?.displayName ?? ''
   const meetingId = meeting.meetingId ?? null
+
   useEffect(() => {
     store.setMeeting(meetingId, localId)
-  }, [store, meetingId, localId])
+    /* onParticipantJoined fires for OTHER people only - you are already in the
+       room by the time you can listen for it. Without this the local
+       participant never enters the store, so the roster is short by one, the
+       rail is empty in a class of one, and the control bar reads its own mic
+       state as false because there is no self to read. */
+    if (localId) {
+      store.upsertParticipant(localId, { name: localName || 'You', isLocal: true })
+    }
+  }, [store, meetingId, localId, localName])
 
   return null
 }

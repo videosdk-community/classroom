@@ -110,3 +110,66 @@ store; feature hooks read that store through `useSyncExternalStore`.
 
 It competes with the board for centre stage, in a campaign whose entire angle is
 that the board *is* the class.
+
+## What the SDK actually does, where the docs and typings disagree
+
+Every claim here was checked against the shipped `@videosdk.live/react-sdk@1.1.1` and
+`@videosdk.live/js-sdk@1.1.1` in `node_modules`, or driven in a browser. None of it is inferred. It
+is recorded because each one costs an afternoon to rediscover, and because the typings are wrong
+often enough that reading them alone is not enough.
+
+**`onEntryResponded` ships two different shapes.** The bundle emits two positional arguments -
+`useCallback(function (id, d) { eventEmitter.emit(events['entry-responded'], id, d) })` - while the
+`.d.ts` declares a single `{ participantId, decision }` object. Both are normalised at the seam, and
+the decision is matched on substrings rather than equality: the value passes straight through from
+the server, and a casing difference would strand a student on the waiting screen forever.
+
+**Pubsub messages carry an id, and that is the problem.** js-sdk builds it as
+`id: serverMessage.messageId || ""`. An empty string is falsy *and* equal to every other empty
+string, so `key={m.id}` collides silently and React reuses the wrong node, which looks like messages
+changing author. Keys fall back to `persistMsgId`, then to `senderId` plus `seqNum`. Both `seqNum`
+and `persistMsgId` exist and neither is in the `.d.ts`. `seqNum` is the server's monotonic sequence
+and the only trustworthy ordering key; `timestamp`'s clock domain is unestablished and is never read.
+`topic` lives on the batch, not the message, despite the typings saying otherwise.
+
+**Moderation is per-participant.** `enableMic` / `disableMic` hang off the `Participant` object
+(`participant.d.ts:70-82`), not off `useMeeting()`. And the asymmetry is real: `disableMic` lands
+immediately, `enableMic` only *requests* and fires `onMicRequested` on the target. The action is
+named "Ask to unmute" so the UI cannot imply otherwise.
+
+**The whiteboard error codes are not on `Constants.errors`.** 4054, 4055 and 4056 have no exported
+symbol and are hard-coded. `startWhiteboard()` reports a failure twice, emitting to `onError` and
+then rethrowing, so a bare call leaves an unhandled rejection and a doubled message. And 4056 is
+never raised client-side - it arrives from the server *after* a double-click has happened - so it
+cannot drive the in-flight disable. That flag is ours, set optimistically and cleared in `finally`.
+
+**`checkPermissions` cannot see the permission door.** js-sdk collapses both states with
+`if (res.state == "prompt" || res.state == "denied") allowed = false`, so "never asked" and "blocked"
+are indistinguishable - a UI built on it either sends a first-time user to a settings walkthrough or
+hands a blocked user a Retry button that cannot work. It also throws where the descriptor is
+unsupported, which breaks precall outright on Firefox rather than degrading. Precall reads
+`navigator.permissions.query` directly.
+
+**`createCameraVideoTrack` and `createMicrophoneAudioTrack` are top-level exports**, not members of
+`useMediaDevice`. Destructuring them off the hook gives `undefined` and fails at call time.
+`checkPermissions` returns a `Map`, so results need `.get('audio')` rather than a property read.
+
+**`MeetingProvider` reads its config once.** `reinitialiseMeetingOnConfigChange` defaults to false,
+so custom precall tracks only take effect if they exist before the provider mounts. Precall and the
+room are siblings for that reason, not for tidiness.
+
+**Two `getUserMedia` calls on one device can deadlock.** Hardware that cannot be opened twice leaves
+the second call neither resolving nor rejecting, so the preview never appears and nothing is logged.
+Acquisition is gated on a known device id, the previous stream is released before the next is opened,
+and every call is raced against a deadline so a hang reports itself.
+
+**Whiteboard state does reach late joiners.** `useWhiteboard` is plain `useState(null)` fed only by
+the `whiteboard-started` event with no initial query, which reads like a participant joining after
+the board started would never receive the URL. Probed in three browsers on 2026-08-20: the board
+reached both an existing participant and one who joined afterwards. The server replays the event on
+join. Settled, and not a reason to add a pubsub fallback.
+
+**`respondEntry(id, decision)` exists on `useMeeting`**, so an admit or deny is addressable by
+participant id and the allow/deny closures are not the only handle. It needs probing before being
+relied on - the typings disagree with themselves on whether `decision` is a string or a boolean -
+but it may soften the teacher-reload hole described above.

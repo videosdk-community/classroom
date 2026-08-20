@@ -1,0 +1,72 @@
+import { ChatPanel } from './ChatPanel'
+import { PeoplePanel } from './PeoplePanel'
+import { Tile } from './Tile'
+import { RoomIcon } from './icons'
+import type { PanelKind } from './ControlBar'
+import type { ChatMessage, ClassMode, Person } from '../fixtures/classroom'
+
+/* The right-hand panel, 320px.
+
+   In Lecture it also carries the stage. One face across a 112px full-width
+   band is waste, so the rail unmounts and the teacher moves into the panel's
+   top slot instead - "teacher onstage, students listed below", exactly as the
+   spec puts it.
+
+   The tile in that slot is 4:3, not 16:9. Panel width drives tile width here,
+   and in a narrow column 4:3 buys real vertical presence where 16:9 would
+   give a letterbox strip. */
+
+export const SIDE_PANEL_WIDTH = 320
+
+export interface SidePanelProps {
+  panel: Exclude<PanelKind, null>
+  mode: ClassMode
+  self: Person
+  people: Person[]
+  messages: ChatMessage[]
+  chatEnabled: boolean
+  onHide: () => void
+}
+
+export function SidePanel({
+  panel,
+  mode,
+  self,
+  people,
+  messages,
+  chatEnabled,
+  onHide,
+}: SidePanelProps) {
+  return (
+    <aside
+      className="flex shrink-0 flex-col border-l border-line bg-card"
+      style={{ width: SIDE_PANEL_WIDTH }}
+    >
+      {mode === 'lecture' && (
+        <div className="shrink-0 border-b border-line p-3">
+          <Tile person={self} self className="aspect-[4/3] w-full" />
+        </div>
+      )}
+
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
+        <RoomIcon name={panel === 'chat' ? 'chat' : 'users'} size={15} className="text-ink-tertiary" />
+        <span className="text-base font-semibold text-ink">
+          {panel === 'chat' ? 'Messages' : `People (${people.length})`}
+        </span>
+        <button
+          type="button"
+          onClick={onHide}
+          className="ml-auto cursor-pointer border-0 bg-transparent p-0 text-sm text-ink-tertiary hover:text-ink"
+        >
+          Hide
+        </button>
+      </div>
+
+      {panel === 'chat' ? (
+        <ChatPanel messages={messages} enabled={chatEnabled} />
+      ) : (
+        <PeoplePanel people={people} selfId={self.id} />
+      )}
+    </aside>
+  )
+}

@@ -119,6 +119,10 @@ export function useBaseRect(ratio: number = BOARD_RATIO) {
 
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
+      /* Under a `flex-1 min-h-0` parent the first callback can arrive with a
+         0x0 rect. Writing it means a wasted render and a frame where the
+         board is absent rather than merely unsized. */
+      if (width === 0 || height === 0) return
       const fittedHeight = width / ratio
       if (fittedHeight <= height) {
         setRect({ width, height: fittedHeight, extraX: 0, extraY: (height - fittedHeight) / 2 })
@@ -150,3 +154,22 @@ export function fractionToPx(rect: BaseRect, fx: number, fy: number) {
 export function isBoardBelowFloor(rect: BaseRect) {
   return rect.width > 0 && rect.width < BOARD_HARD_FLOOR_WIDTH
 }
+
+/* The window width below which the side panel must stop taking width from the
+   board and overlay it instead.
+
+   Derived rather than chosen: the board wants MIN_BOARD.width, the stage adds
+   24px of surround on each side, and the panel is 320px. Below the sum,
+   something has to give, and the rule is that the panel gives first. The board
+   is the product; the chat is not.
+
+   Keyed to MIN_BOARD (900, comfortable) and NOT to BOARD_HARD_FLOOR_WIDTH
+   (800, where tldraw's toolbar wraps). Keying it to the hard floor would be
+   self-defeating: 800 is below 900, so the panel would only yield after the
+   board had already been squeezed past comfortable, and the rule would fire
+   exactly too late to be worth having. The hard floor is what the warning
+   below is for - the case where the window is short rather than narrow, and
+   giving the panel's width back cannot help. */
+export const STAGE_SURROUND = 24
+export const PANEL_OVERLAY_BREAKPOINT =
+  MIN_BOARD.width + STAGE_SURROUND * 2 + 320

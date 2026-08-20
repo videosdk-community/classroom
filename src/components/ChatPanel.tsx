@@ -3,11 +3,20 @@ import { RoomIcon } from './icons'
 import { Input } from '../design/ui'
 import type { ChatMessage } from '../fixtures/classroom'
 
-/* Chat. Step 4 replaces the fixture list with a persisted pubsub topic, at
-   which point two things here become load-bearing: pubsub messages carry no
-   id field, so keys are synthesised at the seam rather than here; and the
-   timestamp's clock domain is unestablished, so this list renders in arrival
-   order and never sorts. */
+/* Chat. Step 4 replaces the fixture list with a persisted pubsub topic.
+
+   Two notes for when it does, both checked against js-sdk 1.1.1 rather than
+   taken from the plan, which is wrong on the first one:
+
+   - Messages DO carry an id. It is built as `messageId || ""`, so the hazard
+     is not an absent field but an empty string: falsy, and equal to every
+     other empty string, so `key={m.id}` collides silently instead of failing
+     loudly. Keys get synthesised at the seam, falling back to persistMsgId
+     and then to senderId plus seqNum.
+   - `seqNum` exists and is the server's monotonic sequence; the SDK uses gaps
+     in it to detect drops. It is a real ordering key. `timestamp`'s clock
+     domain is not established, so this list renders in arrival order and
+     never sorts by it. */
 
 export interface ChatPanelProps {
   messages: ChatMessage[]

@@ -2,6 +2,7 @@ import { ChatPanel } from './ChatPanel'
 import { PeoplePanel } from './PeoplePanel'
 import { Tile } from './Tile'
 import { RoomIcon } from './icons'
+import { cn } from '../design/ui'
 import type { PanelKind } from './ControlBar'
 import type { ChatMessage, ClassMode, Person } from '../fixtures/classroom'
 
@@ -25,6 +26,11 @@ export interface SidePanelProps {
   people: Person[]
   messages: ChatMessage[]
   chatEnabled: boolean
+  /** Once the window is too narrow for both, the panel floats over the stage
+      instead of taking width from it, so the board never gets squeezed below
+      the size its own toolbar needs. The board is the product; the chat is
+      not. */
+  overlay: boolean
   onHide: () => void
 }
 
@@ -35,12 +41,21 @@ export function SidePanel({
   people,
   messages,
   chatEnabled,
+  overlay,
   onHide,
 }: SidePanelProps) {
   return (
     <aside
-      className="flex shrink-0 flex-col border-l border-line bg-card"
-      style={{ width: SIDE_PANEL_WIDTH }}
+      className={cn(
+        'flex shrink-0 flex-col border-l border-line bg-card',
+        /* bottom-16, not inset-y-0. The control bar is the last 64px of the
+           main column, and a panel that floats over it takes Leave with it. */
+        overlay && 'absolute right-0 top-0 bottom-16 z-30',
+      )}
+      style={{
+        width: SIDE_PANEL_WIDTH,
+        boxShadow: overlay ? '-16px 0 48px rgba(0,0,0,.55)' : undefined,
+      }}
     >
       {mode === 'lecture' && (
         <div className="shrink-0 border-b border-line p-3">

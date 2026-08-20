@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   BOARD_BG,
+  BOARD_HARD_FLOOR_WIDTH,
   BOARD_KEEPOUT,
   isBoardBelowFloor,
   useBaseRect,
@@ -74,10 +75,22 @@ export function BoardStage({ boardOn, showKeepout = false }: BoardStageProps) {
               Top-centre, because that is one of the three regions the probe
               found free. tldraw owns top-left (page menu), the whole bottom
               edge (toolbar), the right edge (style panel) and bottom-left
-              (zoom). */}
+              (zoom).
+
+              The layer is pointer-events-none and every interactive leaf opts
+              back in. In step 4 the board underneath becomes an iframe, and a
+              full-bleed layer that accepts pointer events would eat every
+              stroke before it reached the canvas. */}
+          <div className="pointer-events-none absolute inset-0">
           {boardOn && !hintDismissed && (
             <div
-              className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-pill py-1.5 pl-3 pr-1.5"
+              /* pointer-events-auto on the pill itself, because the layer it
+                 sits in is pointer-events-none. An iframe swallows nothing and
+                 blocks everything: any transparent overlay above it that still
+                 accepts pointer events makes the board undrawable, and that
+                 reads as "the embed broke" rather than as a CSS mistake. The
+                 rule is enforced by the wrapper below, not by remembering. */
+              className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-pill py-1.5 pl-3 pr-1.5"
               style={{
                 top: 0.022 * rect.height,
                 background: 'rgba(9,9,11,.86)',
@@ -102,6 +115,8 @@ export function BoardStage({ boardOn, showKeepout = false }: BoardStageProps) {
               </button>
             </div>
           )}
+
+          </div>
 
           {showKeepout &&
             BOARD_KEEPOUT.map((region) => {
@@ -128,10 +143,14 @@ export function BoardStage({ boardOn, showKeepout = false }: BoardStageProps) {
         </div>
       )}
 
+      {/* Only reachable when the window is genuinely too small - the panel has
+          already collapsed by this point, so there is nothing left to reclaim
+          and no action to suggest beyond a bigger window. Telling the user to
+          hide a panel that is not there would be the more annoying bug. */}
       {squeezed && (
         <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center">
           <span className="rounded-pill bg-warning-bg px-3 py-1 text-sm text-warning-fg">
-            The window is narrow enough that the board's own toolbar will wrap. Hide the panel.
+            This window is small for a whiteboard. The board's own toolbar will wrap below {BOARD_HARD_FLOOR_WIDTH}px.
           </span>
         </div>
       )}

@@ -37,14 +37,26 @@ export function VideoRail({ people, selfId, onOverflowClick }: VideoRailProps) {
         ))}
 
         {overflow > 0 && (
-          <button
-            type="button"
-            onClick={onOverflowClick}
-            className="flex h-[96px] w-[72px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-0 bg-inset text-ink-tertiary hover:text-ink"
-          >
-            <span className="text-lg font-semibold">+{overflow}</span>
-            <span className="text-xs uppercase tracking-wide">more</span>
-          </button>
+          /* Sticky, not merely last. Once the tiles overflow, a chip parked at
+             the end of the scroll content is off-screen exactly when it is
+             needed - the rail then reads as a row of clipped faces rather
+             than as "there are more people". Pinned to the right edge it
+             stays the answer to the question the clipping raises. The left
+             fade is what stops a tile appearing to be sliced by it. */
+          <div className="sticky right-0 flex h-full shrink-0 items-center pl-6">
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 w-6"
+              style={{ background: 'linear-gradient(to right, transparent, var(--bg-base))' }}
+            />
+            <button
+              type="button"
+              onClick={onOverflowClick}
+              className="relative flex h-[96px] w-[72px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-0 bg-inset text-ink-tertiary hover:text-ink"
+            >
+              <span className="text-lg font-semibold">+{overflow}</span>
+              <span className="text-xs uppercase tracking-wide">more</span>
+            </button>
+          </div>
         )}
       </div>
     </div>

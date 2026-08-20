@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="172" viewBox="0 0 172 172" fill="none">
+  <defs>
+    <linearGradient id="vsdk-mark" x1="86" y1="172" x2="86" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3D85EE"></stop>
+      <stop offset="1" stop-color="#FD8915"></stop>
+    </linearGradient>
+  </defs>
+  <path d="M 0 16 C 0 7.163 7.163 0 16 0 L 134.305 0 C 148.425 0 155.623 16.958 145.814 27.115 L 20.722 156.645 C 20.241 157.142 19.719 157.597 19.161 158.005 C 11.198 163.821 0 158.134 0 148.272 L 0 16 Z" fill="url(#vsdk-mark)" fill-rule="nonzero"></path>
+</svg>

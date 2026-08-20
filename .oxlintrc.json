@@ -12,6 +12,12 @@
             "name": "@videosdk.live/react-sdk",
             "message": "The VideoSDK SDK may only be imported from src/sdk/, the app-owned seam. Import from src/sdk instead so an SDK bump touches one directory."
           }
+        ],
+        "patterns": [
+          {
+            "group": ["@videosdk.live/*", "@videosdk.live/**"],
+            "message": "The seam covers deep paths too. `@videosdk.live/react-sdk/dist/types/...` is still the SDK, and importing its types outside src/sdk/ couples feature code to the vendor's type names just as tightly as importing its hooks."
+          }
         ]
       }
     ]

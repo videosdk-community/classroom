@@ -29,14 +29,6 @@ import {
    below, and the point of the seam is that this file never mentions the SDK -
    it reads app-shaped types from src/sdk and nothing else. */
 
-/* A stable hue per participant so the camera-off placeholder does not change
-   colour on every render. Derived from the id rather than random. */
-function hueFor(id: string) {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
-  return h
-}
-
 /* A stable empty array, so a student's SidePanel does not get a new [] every
    render and re-render the roster for nothing. */
 const EMPTY_QUEUE: readonly EntryRequest[] = []
@@ -51,7 +43,6 @@ function toPerson(p: ParticipantView): Person {
     handRaised: false,
     speaking: p.isActiveSpeaker,
     onstage: true,
-    hue: hueFor(p.id),
   }
 }
 

@@ -20,8 +20,6 @@ export interface Person {
   handRaised: boolean
   speaking: boolean
   onstage: boolean
-  /** Placeholder camera gradient, standing in for a real video track. */
-  hue: number
 }
 
 export interface ChatMessage {

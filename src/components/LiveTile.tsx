@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useParticipantView, useTrack } from '../sdk'
+import { useParticipantView, useRaisedHands, useTrack } from '../sdk'
 import { RoomIcon } from './icons'
 import { cn } from '../design/ui'
 
@@ -26,6 +26,10 @@ export function LiveTile({
 }) {
   const p = useParticipantView(id)
   const stream = useTrack(id, 'cam')
+  /* Read here rather than threaded in as a prop. The set holds its reference
+     when the fold is unchanged, so a chat message does not re-render the
+     rail, and every surface that shows a tile gets the hand for free. */
+  const handRaised = useRaisedHands().has(id)
   const ref = useRef<HTMLVideoElement>(null)
   const self = id === selfId
 
@@ -68,6 +72,17 @@ export function LiveTile({
           >
             {initials}
           </div>
+        </div>
+      )}
+
+      {handRaised && (
+        /* Top-left, away from the name chip, and it keeps the amber it has in
+           the roster so the two read as the same fact. */
+        <div
+          className="absolute left-1.5 top-1.5 flex size-6 items-center justify-center rounded-md backdrop-blur-[4px]"
+          style={{ background: 'rgba(0,0,0,.55)', color: 'var(--amber-500)' }}
+        >
+          <RoomIcon name="hand" size={13} />
         </div>
       )}
 

@@ -35,6 +35,9 @@ export interface SidePanelProps {
   /** Students knocking. Empty for anyone without allow_mod. */
   waiting: readonly EntryRequest[]
   onRespond: (id: string, allow: boolean) => void
+  onMute: (id: string) => void
+  onAskToUnmute: (id: string) => void
+  onLowerHand: (id: string) => void
   chatEnabled: boolean
   onSend: (text: string) => Promise<void>
   /** Once the window is too narrow for both, the panel floats over the stage
@@ -54,6 +57,9 @@ export function SidePanel({
   messages,
   waiting,
   onRespond,
+  onMute,
+  onAskToUnmute,
+  onLowerHand,
   chatEnabled,
   onSend,
   overlay,
@@ -99,6 +105,10 @@ export function SidePanel({
         <PeoplePanel
           people={people}
           selfId={self.id}
+          isTeacher={self.role === 'teacher'}
+          onMute={onMute}
+          onAskToUnmute={onAskToUnmute}
+          onLowerHand={onLowerHand}
           waiting={waiting}
           onRespond={onRespond}
         />

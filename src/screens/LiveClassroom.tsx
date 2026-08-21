@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BoardStage } from '../components/BoardStage'
+import { HandsChip } from '../components/HandsChip'
 import { KnockCard } from '../components/KnockCard'
 import { MediaRequestPrompt } from '../components/MediaRequestPrompt'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
@@ -43,14 +44,14 @@ import {
    render and re-render the roster for nothing. */
 const EMPTY_QUEUE: readonly EntryRequest[] = []
 
-function toPerson(p: ParticipantView): Person {
+function toPerson(p: ParticipantView, raised: ReadonlySet<string>): Person {
   return {
     id: p.id,
     name: p.name,
     role: p.isTeacher ? 'teacher' : 'student',
     micOn: p.micOn,
     camOn: p.camOn,
-    handRaised: false,
+    handRaised: raised.has(p.id),
     speaking: p.isActiveSpeaker,
     onstage: true,
   }
@@ -139,11 +140,17 @@ export function LiveClassroom({
               url={whiteboard.url}
               overlay={
                 isTeacher ? (
-                  <KnockCard
-                    waiting={waiting}
-                    onRespond={(id, allow) => void actions.respondEntry(id, allow)}
-                    onSeeAll={() => setPanel('people')}
-                  />
+                  /* One stack, top-right. Knocks first: somebody waiting to
+                     be let in has nothing else on screen, while a raised hand
+                     is also in the rail and in the roster. */
+                  <div className="flex flex-col items-end gap-2">
+                    <KnockCard
+                      waiting={waiting}
+                      onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+                      onSeeAll={() => setPanel('people')}
+                    />
+                    <HandsChip count={raisedHands.size} onSeeAll={() => setPanel('people')} />
+                  </div>
                 ) : undefined
               }
             />
@@ -198,11 +205,14 @@ export function LiveClassroom({
           <SidePanel
             panel={panel}
             mode={mode}
-            self={toPerson(self)}
+            self={toPerson(self, raisedHands)}
             teacherId={teacherId}
-            people={views.map(toPerson)}
+            people={views.map((p) => toPerson(p, raisedHands))}
             waiting={isTeacher ? waiting : EMPTY_QUEUE}
             onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+            onMute={actions.muteParticipant}
+            onAskToUnmute={actions.askToUnmute}
+            onLowerHand={(id) => void actions.publish(HANDS_TOPIC, encodeHand(id, false))}
             messages={messages.map((m) => ({
               id: m.key,
               who: m.senderName,

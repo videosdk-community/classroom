@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { KnockRow } from './KnockRow'
 import { RoomIcon } from './icons'
 import type { Person } from '../domain/classroom'
@@ -9,6 +10,14 @@ import type { EntryRequest } from '../sdk'
 export interface PeoplePanelProps {
   people: Person[]
   selfId: string
+  /** Server-derived. Teacher rows carry the moderation actions; a student's
+      roster is a list. The buttons are hidden rather than gated, because
+      allow_mod is what actually decides and a disabled button that would
+      never work is worse than no button. */
+  isTeacher: boolean
+  onMute: (id: string) => void
+  onAskToUnmute: (id: string) => void
+  onLowerHand: (id: string) => void
   /** Knocking, not yet in the room. Pinned above the roster because a person
       waiting for an answer outranks a list of people who already have one,
       and because this is where a queue too long for the floating card lands. */
@@ -24,7 +33,38 @@ function initials(name: string) {
     .slice(0, 2)
 }
 
-export function PeoplePanel({ people, selfId, waiting, onRespond }: PeoplePanelProps) {
+function RowAction({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className="h-6 shrink-0 cursor-pointer rounded-md border border-line-strong bg-transparent px-1.5 text-sm text-ink-secondary hover:bg-inset"
+    >
+      {children}
+    </button>
+  )
+}
+
+export function PeoplePanel({
+  people,
+  selfId,
+  isTeacher,
+  onMute,
+  onAskToUnmute,
+  onLowerHand,
+  waiting,
+  onRespond,
+}: PeoplePanelProps) {
   return (
     <div className="flex-1 overflow-y-auto py-1">
       {waiting.length > 0 && (
@@ -39,7 +79,7 @@ export function PeoplePanel({ people, selfId, waiting, onRespond }: PeoplePanelP
       )}
 
       {people.map((p) => (
-        <div key={p.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-raised">
+        <div key={p.id} className="group flex items-center gap-2.5 px-3 py-2 hover:bg-raised">
           <div
             className="flex size-7 shrink-0 items-center justify-center rounded-[50%] text-sm font-semibold"
             style={{ background: 'var(--primary-200)', color: 'var(--primary-900)' }}
@@ -55,6 +95,30 @@ export function PeoplePanel({ people, selfId, waiting, onRespond }: PeoplePanelP
           {p.handRaised && (
             <RoomIcon name="hand" size={14} style={{ color: 'var(--amber-500)' }} />
           )}
+
+          {isTeacher && p.id !== selfId ? (
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              {p.handRaised && (
+                <RowAction label="Lower hand" onClick={() => onLowerHand(p.id)}>
+                  Lower
+                </RowAction>
+              )}
+              {/* Asymmetric, and the copy says so. disableMic lands with no
+                  consent; enableMic only asks and fires onMicRequested on the
+                  target, who decides. There is no force-unmute in the SDK and
+                  this app does not pretend there is. */}
+              {p.micOn ? (
+                <RowAction label={`Mute ${p.name}`} onClick={() => onMute(p.id)}>
+                  Mute
+                </RowAction>
+              ) : (
+                <RowAction label={`Ask ${p.name} to unmute`} onClick={() => onAskToUnmute(p.id)}>
+                  Ask to unmute
+                </RowAction>
+              )}
+            </div>
+          ) : null}
+
           <RoomIcon
             name={p.micOn ? 'mic' : 'micOff'}
             size={14}

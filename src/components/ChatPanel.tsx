@@ -3,28 +3,44 @@ import { RoomIcon } from './icons'
 import { Input } from '../design/ui'
 import type { ChatMessage } from '../domain/classroom'
 
-/* Chat. Step 4 replaces the fixture list with a persisted pubsub topic.
+/* Chat, on an unpersisted pubsub topic.
 
-   Two notes for when it does, both checked against js-sdk 1.1.1 rather than
-   taken from the plan, which is wrong on the first one:
+   Keys are synthesised at the seam. A message's wire id is built as
+   `messageId || ""`, so the hazard is not an absent field but an empty
+   string: falsy, equal to every other empty string, and `key={m.id}` collides
+   silently instead of failing loudly.
 
-   - Messages DO carry an id. It is built as `messageId || ""`, so the hazard
-     is not an absent field but an empty string: falsy, and equal to every
-     other empty string, so `key={m.id}` collides silently instead of failing
-     loudly. Keys get synthesised at the seam, falling back to persistMsgId
-     and then to senderId plus seqNum.
-   - `seqNum` exists and is the server's monotonic sequence; the SDK uses gaps
-     in it to detect drops. It is a real ordering key. `timestamp`'s clock
-     domain is not established, so this list renders in arrival order and
-     never sorts by it. */
+   This list renders in arrival order and never sorts. `timestamp`'s clock
+   domain is not established, and sorting a live conversation by an untrusted
+   clock reorders it in front of the class. */
 
 export interface ChatPanelProps {
   messages: ChatMessage[]
+  /** False once the teacher turns chat off. The teacher's own composer stays
+      live: the toggle is aimed at the class, not at whoever pressed it. */
   enabled: boolean
+  onSend: (text: string) => Promise<void>
 }
 
-export function ChatPanel({ messages, enabled }: ChatPanelProps) {
+export function ChatPanel({ messages, enabled, onSend }: ChatPanelProps) {
   const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const text = draft.trim()
+  const canSend = enabled && text !== '' && !sending
+
+  /* Cleared only after the publish resolves. Clearing on click looks faster
+     and loses the message when the publish throws. */
+  const send = async () => {
+    if (!canSend) return
+    setSending(true)
+    try {
+      await onSend(text)
+      setDraft('')
+    } finally {
+      setSending(false)
+    }
+  }
 
   return (
     <>
@@ -63,12 +79,15 @@ export function ChatPanel({ messages, enabled }: ChatPanelProps) {
           disabled={!enabled}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void send()
+          }}
           placeholder={enabled ? 'Message the class' : 'Chat is off for this class'}
         />
         <button
           type="button"
-          disabled={!enabled || draft.trim() === ''}
-          onClick={() => setDraft('')}
+          disabled={!canSend}
+          onClick={() => void send()}
           className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 bg-transparent text-ink-tertiary hover:bg-raised hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RoomIcon name="send" size={16} />

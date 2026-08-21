@@ -36,6 +36,7 @@ export interface SidePanelProps {
   waiting: readonly EntryRequest[]
   onRespond: (id: string, allow: boolean) => void
   chatEnabled: boolean
+  onSend: (text: string) => Promise<void>
   /** Once the window is too narrow for both, the panel floats over the stage
       instead of taking width from it, so the board never gets squeezed below
       the size its own toolbar needs. The board is the product; the chat is
@@ -54,6 +55,7 @@ export function SidePanel({
   waiting,
   onRespond,
   chatEnabled,
+  onSend,
   overlay,
   onHide,
 }: SidePanelProps) {
@@ -90,7 +92,9 @@ export function SidePanel({
         </div>
       )}
 
-      {panel === 'chat' && <ChatPanel messages={messages} enabled={chatEnabled} />}
+      {panel === 'chat' && (
+        <ChatPanel messages={messages} enabled={chatEnabled} onSend={onSend} />
+      )}
       {panel === 'people' && (
         <PeoplePanel
           people={people}

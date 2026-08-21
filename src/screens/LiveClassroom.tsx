@@ -186,7 +186,8 @@ export function LiveClassroom({
               mine: m.senderId === localId,
               at: '',
             }))}
-            chatEnabled={chatEnabled}
+            chatEnabled={chatEnabled || isTeacher}
+            onSend={(text) => actions.publish(CHAT_TOPIC, text)}
             overlay={overlayPanel}
             onHide={() => setPanel(null)}
           />

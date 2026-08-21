@@ -58,7 +58,12 @@ export interface RoomActions {
   publish: (topic: string, text: string, persist: boolean) => Promise<void>
 }
 
-export function createRoomStore() {
+/* teacherId comes from api/session.ts, which derives it from room ownership.
+   Passed in at construction rather than set later: the store is created in the
+   same memo as the provider that mounts the meeting, so it is known before any
+   participant row can exist, and a row can never be built with the wrong role
+   and corrected a frame later. */
+export function createRoomStore(teacherId: string | null = null) {
   let snapshot: RoomSnapshot = INITIAL
   let version = 0
   const listeners = new Set<() => void>()
@@ -168,12 +173,16 @@ export function createRoomStore() {
         id,
         name: 'Someone',
         isLocal: false,
-        isTeacher: false,
+        isTeacher: id === teacherId,
         micOn: false,
         camOn: false,
         isActiveSpeaker: false,
       }
-      const next: ParticipantView = { ...base, ...patch, id }
+      /* Role is derived here and nowhere else. No caller may pass it in: the
+         only truthful source is the server's ownership lookup, and letting a
+         patch set it is how the local row ends up right while every remote row
+         quietly stays a student. */
+      const next: ParticipantView = { ...base, ...patch, id, isTeacher: id === teacherId }
       if (prev && shallowEqual(next, prev)) return
 
       const participants = { ...snapshot.participants, [id]: next }

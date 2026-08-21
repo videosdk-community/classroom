@@ -28,9 +28,13 @@ export interface RoomProviderProps {
      the two agree. Passed separately because the store needs it before the
      SDK reports a local participant. */
   participantId: string
-  /* Server-derived, from room ownership. It decides which controls are drawn
-     and nothing more - the real enforcement is allow_mod inside the token. */
-  isTeacher: boolean
+  /* The teacher's participantId, server-derived from room ownership. Every
+     participant row's role is decided by comparing against this, so the
+     roster and the Lecture stage agree with the server rather than with a
+     broadcast claim. Whether the LOCAL user is the teacher is a separate
+     concern and stays a prop on the screens - the real enforcement is
+     allow_mod inside the token, and nothing here. */
+  teacherId: string
   micEnabled: boolean
   camEnabled: boolean
   customCameraVideoTrack?: MediaStream
@@ -43,15 +47,18 @@ export function RoomProvider({
   token,
   name,
   participantId,
-  isTeacher,
+  teacherId,
   micEnabled,
   camEnabled,
   customCameraVideoTrack,
   customMicrophoneAudioTrack,
   children,
 }: RoomProviderProps) {
-  /* One store per provider instance, created once. */
-  const store = useMemo(() => createRoomStore(), [])
+  /* One store per provider instance. teacherId is in the dependency list for
+     honesty rather than for reactivity - it comes from the session response
+     and is fixed for the life of a room - but a store rebuilt mid-meeting
+     would drop every participant row, so nothing else may join it here. */
+  const store = useMemo(() => createRoomStore(teacherId), [teacherId])
 
   return (
     <MeetingProvider
@@ -71,7 +78,7 @@ export function RoomProvider({
       joinWithoutUserInteraction
     >
       <RoomStoreContext.Provider value={store}>
-        <MeetingBridge store={store} isTeacher={isTeacher} />
+        <MeetingBridge store={store} />
         <ParticipantBridges store={store} />
         <WhiteboardBridge store={store} />
         <PubSubBridge topic={CHAT_TOPIC} store={store} persist={false} />

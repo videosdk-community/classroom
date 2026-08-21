@@ -147,7 +147,7 @@ function PrecallThenRoom({
       token={fresh.token}
       name={joined.name}
       participantId={fresh.participantId}
-      isTeacher={fresh.role === 'teacher'}
+      teacherId={fresh.teacherParticipantId}
       micEnabled={joined.micOn}
       camEnabled={joined.camOn}
       customCameraVideoTrack={joined.tracks.camera}

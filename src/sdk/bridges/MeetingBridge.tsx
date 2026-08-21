@@ -30,7 +30,7 @@ const STATUS: Record<string, RoomStatus> = {
   DISCONNECTED: 'disconnected',
 }
 
-export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeacher: boolean }) {
+export function MeetingBridge({ store }: { store: RoomStore }) {
   const meeting = useMeeting({
     onMeetingJoined() {
       store.setStatus('connected')
@@ -189,13 +189,13 @@ export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeache
        rail is empty in a class of one, and the control bar reads its own mic
        state as false because there is no self to read. */
     if (localId) {
-      /* isTeacher is seeded here, from the session response, and only ever
-         for the LOCAL participant. Nothing the SDK exposes lets a client
-         derive somebody else's role, so remote rows stay false until a later
-         step announces it - which will be broadcast state, not enforcement. */
-      store.upsertParticipant(localId, { name: localName || 'You', isLocal: true, isTeacher })
+      /* No isTeacher here. The store derives it for every row, local and
+         remote alike, from the teacher's participantId the session handed
+         back - so a student's roster labels the teacher correctly instead of
+         showing the whole room as students. */
+      store.upsertParticipant(localId, { name: localName || 'You', isLocal: true })
     }
-  }, [store, meetingId, localId, localName, isTeacher])
+  }, [store, meetingId, localId, localName])
 
   return null
 }

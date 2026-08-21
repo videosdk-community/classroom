@@ -20,8 +20,9 @@ Three members, and a video call becomes a teaching surface.
 
 ## Status
 
-Scaffolded. The shell, the SDK seam, auth, the lobby and the class controls are
-being built in order - see `docs/DECISIONS.md` for what is already settled.
+In progress. The shell, the SDK seam, precall, auth and server-derived roles
+are done; the lobby and the class controls are next. See `docs/DECISIONS.md`
+for what is already settled and why.
 
 ## Stack
 
@@ -36,19 +37,32 @@ being built in order - see `docs/DECISIONS.md` for what is already settled.
 pnpm install
 cp .env.example .env
 # fill in the values, then
+pnpm vercel login && pnpm vercel link
 pnpm dev
 ```
+
+`pnpm dev` runs `vercel dev`, which serves the app **and** the serverless
+functions in `api/` from **one origin on port 3000**. Plain `vite` has no
+`/api` at all, so a sign-in there fails on a request that returns `index.html`
+instead of JSON. `pnpm dev:vite` exists for pure UI work where that does not
+matter.
 
 You need a [VideoSDK](https://app.videosdk.live) API key and secret, and a
 Supabase project. **`VIDEOSDK_API_KEY`, `VIDEOSDK_SECRET` and the Supabase service
 role key are server-only and must never carry a `VITE_` prefix** - anything
 `VITE_`-prefixed is inlined into the browser bundle at build time.
 
+In your Supabase project, add `http://localhost:3000/**` and your deployed
+domain to **Authentication - URL Configuration - Redirect URLs**, and set the
+Site URL to match. The built-in email sender is rate-limited to a few messages
+an hour, which is enough to sign in but not enough to iterate on.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
-| `pnpm dev` | Vite dev server |
+| `pnpm dev` | App **and** `api/` functions on `localhost:3000`, via `vercel dev` |
+| `pnpm dev:vite` | Vite alone on `localhost:5173`. No `/api` - UI work only |
 | `pnpm build` | Typecheck, then production build |
 | `pnpm lint` | oxlint, including the SDK seam rule |
 

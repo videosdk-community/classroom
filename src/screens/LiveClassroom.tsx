@@ -4,7 +4,7 @@ import { ControlBar, type PanelKind } from '../components/ControlBar'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
 import { LiveTile } from '../components/LiveTile'
-import type { ClassMode, Person } from '../fixtures/classroom'
+import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import {

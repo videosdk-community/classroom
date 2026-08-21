@@ -1,5 +1,5 @@
 import { Tile } from './Tile'
-import type { Person } from '../fixtures/classroom'
+import type { Person } from '../domain/classroom'
 
 /* The horizontal video rail, Class mode only.
 

@@ -1,6 +1,6 @@
 import { RoomIcon } from './icons'
 import { cn } from '../design/ui'
-import type { Person } from '../fixtures/classroom'
+import type { Person } from '../domain/classroom'
 
 /* A participant tile. Camera placeholder for now - step 4 swaps the gradient
    for a real <video> off the SDK stream and nothing else here changes.

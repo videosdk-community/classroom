@@ -1,5 +1,5 @@
 import { RoomIcon } from './icons'
-import type { Person } from '../fixtures/classroom'
+import type { Person } from '../domain/classroom'
 
 /* The roster. Also where the rail's overflow lands, so it is the answer to
    "a rail is not a plan for forty students" rather than a secondary surface. */

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RoomIcon } from './icons'
 import { Input } from '../design/ui'
-import type { ChatMessage } from '../fixtures/classroom'
+import type { ChatMessage } from '../domain/classroom'
 
 /* Chat. Step 4 replaces the fixture list with a persisted pubsub topic.
 

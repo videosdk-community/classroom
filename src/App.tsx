@@ -4,7 +4,7 @@ import { Classroom } from './screens/Classroom'
 import { LiveClassroom } from './screens/LiveClassroom'
 import { Precall } from './screens/Precall'
 import { RoomProvider, devSession, type PrecallTracks } from './sdk'
-import type { ClassMode } from './fixtures/classroom'
+import type { ClassMode } from './domain/classroom'
 
 /* Routes.
 

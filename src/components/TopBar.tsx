@@ -1,5 +1,5 @@
 import { RoomIcon } from './icons'
-import type { ClassMode } from '../fixtures/classroom'
+import type { ClassMode } from '../domain/classroom'
 
 /* The 56px top bar: what class this is, what shape it is, and whether it is
    being recorded. */

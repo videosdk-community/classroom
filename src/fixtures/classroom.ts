@@ -1,26 +1,14 @@
 /* Fake data only. No SDK, no network, nothing that outlives a refresh.
 
-   Step 3 exists so the dark shell can be judged against the real board before
-   anything is wired, so this file is deliberately the only source of truth in
-   the screen and is deleted when the seam lands in step 4.
+   Feeds the /room fixture route, which is still the fastest way to judge the
+   shell at a window size without burning meeting minutes. The types it is
+   built from moved to src/domain/classroom.ts, because those outlive the fake
+   data and the live path uses them too.
 
    Sized past the rail cap on purpose. A rail is not a plan for forty
    students, and the "+N" chip only proves it works if N is real. */
 
-export type Role = 'teacher' | 'student'
-
-export interface Person {
-  id: string
-  name: string
-  role: Role
-  micOn: boolean
-  camOn: boolean
-  handRaised: boolean
-  speaking: boolean
-  onstage: boolean
-  /** Placeholder camera gradient, standing in for a real video track. */
-  hue: number
-}
+import type { ChatMessage, Person } from '../domain/classroom'
 
 export const PEOPLE: Person[] = [
   { id: 'p1',  name: 'Zishan Ahmad',    role: 'teacher', micOn: true,  camOn: true,  handRaised: false, speaking: true,  onstage: true,  hue: 265 },
@@ -45,14 +33,6 @@ export const PEOPLE: Person[] = [
 
 export const TEACHER = PEOPLE[0]
 
-export interface ChatMessage {
-  id: string
-  who: string
-  text: string
-  mine: boolean
-  at: string
-}
-
 export const MESSAGES: ChatMessage[] = [
   { id: 'm1', who: 'Aditi Rao',   text: 'can you scroll up a bit? the top line is cut off', mine: false, at: '10:02' },
   { id: 'm2', who: 'You',         text: 'better?', mine: true, at: '10:02' },
@@ -62,7 +42,3 @@ export const MESSAGES: ChatMessage[] = [
   { id: 'm6', who: 'Priya Nair',  text: 'could you write the general form once more', mine: false, at: '10:07' },
   { id: 'm7', who: 'Chen Wei',    text: 'am I allowed to draw on this or is it just yours?', mine: false, at: '10:08' },
 ]
-
-/** Layout plus convention, both of them. Fixed at room creation and read once
-    at join; there is no mid-class switch, so nothing here announces a change. */
-export type ClassMode = 'class' | 'lecture'

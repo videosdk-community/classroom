@@ -4,7 +4,7 @@ import { Tile } from './Tile'
 import { RoomIcon } from './icons'
 import { cn } from '../design/ui'
 import type { PanelKind } from './ControlBar'
-import type { ChatMessage, ClassMode, Person } from '../fixtures/classroom'
+import type { ChatMessage, ClassMode, Person } from '../domain/classroom'
 
 /* The right-hand panel, 320px.
 

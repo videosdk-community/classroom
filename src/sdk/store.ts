@@ -54,9 +54,17 @@ export interface RoomActions {
   toggleMic: () => void
   toggleWebcam: () => void
   muteParticipant: (id: string) => void
-  /** Every remote mic off, in one pass. The SDK has no mute-all. */
-  muteEveryoneElse: () => void
+  /** Every remote mic off, in one pass. The SDK has no mute-all.
+      Returns how many mics it actually turned off, so the teacher gets told
+      what happened rather than having to count the roster. */
+  muteEveryoneElse: () => number
   askToUnmute: (id: string) => void
+  /* Cloud recording. Fire-and-forget on purpose: the truth about whether it
+     is running arrives on onRecordingStateChanged, not from the return of
+     these calls, so nothing here awaits a promise whose value would be stale
+     by the time a caller read it. */
+  startRecording: () => void
+  stopRecording: () => void
   startWhiteboard: () => Promise<void>
   stopWhiteboard: () => Promise<void>
   respondEntry: (id: string, allow: boolean) => Promise<void>
@@ -138,9 +146,18 @@ export function createRoomStore(teacherId: string | null = null) {
     toggleWebcam: () => (actions ? actions.toggleWebcam() : notReady('toggleWebcam')()),
     muteParticipant: (id) =>
       actions ? actions.muteParticipant(id) : notReady('muteParticipant')(),
-    muteEveryoneElse: () =>
-      actions ? actions.muteEveryoneElse() : notReady('muteEveryoneElse')(),
+    /* The only action with a return value, so it cannot fall through to
+       notReady's void the way its neighbours do. Before the bridges register
+       there is nothing muted, and 0 says exactly that - undefined leaking out
+       of here would reach the UI as "muted undefined people". */
+    muteEveryoneElse: () => {
+      if (actions) return actions.muteEveryoneElse()
+      notReady('muteEveryoneElse')()
+      return 0
+    },
     askToUnmute: (id) => (actions ? actions.askToUnmute(id) : notReady('askToUnmute')()),
+    startRecording: () => (actions ? actions.startRecording() : notReady('startRecording')()),
+    stopRecording: () => (actions ? actions.stopRecording() : notReady('stopRecording')()),
     startWhiteboard: async () => {
       if (actions) await actions.startWhiteboard()
       else notReady('startWhiteboard')()

@@ -30,6 +30,24 @@ const STATUS: Record<string, RoomStatus> = {
   DISCONNECTED: 'disconnected',
 }
 
+/* How the cloud composites this class.
+
+   SPOTLIGHT with PIN priority rather than GRID because this is a board-centric
+   class: what is worth keeping is the board and whoever is talking over it,
+   not forty tiled faces shrinking as the room fills. The recording is the
+   lesson, and the lesson happens on the board.
+
+   The board is ratio-locked to 16:9 partly because of this composition - see
+   BOARD_RATIO in src/lib/boardGeometry.ts for the full reasoning, which is not
+   repeated here so the two cannot drift apart. */
+const RECORDING_CONFIG = {
+  layout: { type: 'SPOTLIGHT', priority: 'PIN' },
+  theme: 'DARK',
+  mode: 'video-and-audio',
+  quality: 'high',
+  orientation: 'landscape',
+} as const
+
 export function MeetingBridge({ store }: { store: RoomStore }) {
   const meeting = useMeeting({
     onMeetingJoined() {
@@ -150,12 +168,39 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
          the Participant class - `isLocal` exists only on useParticipant's
          return, and the doc snippet that uses it here mutes you too. */
       muteEveryoneElse: () => {
+        let muted = 0
         for (const participant of ref.current.participants.values()) {
-          if (!participant.local) void participant.disableMic()
+          if (!participant.local) {
+            void participant.disableMic()
+            muted++
+          }
         }
+        return muted
       },
       askToUnmute: (id) => {
         void ref.current.participants.get(id)?.enableMic()
+      },
+      /* startRecording(webhookUrl, awsDirPath, config, transcription). ALL FOUR
+         ARGUMENTS ARE POSITIONAL and all four are optional, so the two leading
+         nulls are load-bearing: `startRecording(RECORDING_CONFIG)` would pass
+         the config as the webhook URL and the recording would run with default
+         layout, silently and with no error anywhere. Do not "tidy" them away.
+
+         The cast is here because meeting.d.ts:211-231 declares webhookUrl and
+         awsDirPath as required `string`, requires config.layout.gridSize, and
+         has no `orientation` field - none of which matches what the runtime
+         accepts. One cast at the call site, the same treatment as
+         onEntryResponded above, rather than loosening the config's own type. */
+      startRecording: () => {
+        const start = ref.current.startRecording as unknown as (
+          webhookUrl: null,
+          awsDirPath: null,
+          config: typeof RECORDING_CONFIG,
+        ) => Promise<void>
+        void start(null, null, RECORDING_CONFIG)
+      },
+      stopRecording: () => {
+        void ref.current.stopRecording()
       },
       startWhiteboard: async () => {},
       stopWhiteboard: async () => {},

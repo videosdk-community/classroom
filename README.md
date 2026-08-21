@@ -65,6 +65,7 @@ an hour, which is enough to sign in but not enough to iterate on.
 | `pnpm dev:vite` | Vite alone on `localhost:5173`. No `/api` - UI work only |
 | `pnpm build` | Typecheck, then production build |
 | `pnpm lint` | oxlint, including the SDK seam rule |
+| `node scripts/dev-session.mjs <email>` | Sign a test account in without an email |
 
 ## The SDK seam
 
@@ -79,6 +80,8 @@ directory. See `src/sdk/README.md`.
 - **A teacher can mute a student but cannot force-unmute them** - unmute only
   sends a request the student accepts.
 - **Students knock.** They hold `ask_join`, so joining goes through a lobby.
+- **Your role is decided by the server**, from who owns the room in Supabase. It is
+  never read from the URL, a query string, or anything else the browser says.
 
 None of that is a workaround; it is what the platform actually offers, and
 `docs/DECISIONS.md` explains each one.

@@ -173,3 +173,123 @@ join. Settled, and not a reason to add a pubsub fallback.
 participant id and the allow/deny closures are not the only handle. It needs probing before being
 relied on - the typings disagree with themselves on whether `decision` is a string or a boolean -
 but it may soften the teacher-reload hole described above.
+
+## Role is derived from room ownership, server-side
+
+`api/session.ts` verifies the Supabase session, looks up `public.rooms.owner_id`, and mints
+`['allow_join','allow_mod']` or `['ask_join']` from that comparison. **Every other field in the
+request is ignored** - no role, no mode, no participant id is ever read from the client. Ownership
+is the only input.
+
+The response also carries a `role` field. It is **decoration**, for deciding which controls to
+draw. The enforcement is the `permissions` array inside the signed token and nowhere else. Never
+gate a moderation action on `role` alone.
+
+Verified, not assumed: the same room, requested with two different `Authorization` headers and
+nothing else changed, returns `["allow_join","allow_mod"]` to the owner and `["ask_join"]` to
+everyone else. In the browser the student then sits at `connecting` - knocking - rather than
+walking in.
+
+## The student never reads `public.rooms`
+
+RLS on that table is strictly owner-scoped, and there is **no insert policy at all**; the `insert`
+grant is revoked from `anon` and `authenticated` as well, so an insert policy added later by
+accident still cannot let a browser claim a roomId it does not own. Rows are written only by
+`api/rooms.ts` under the service role, because creating the VideoSDK room needs the signing secret.
+
+A student joining by link therefore reads nothing from the table. `api/session.ts` already has the
+row in hand to derive the role, so it returns `mode` and `title` in the same response as the token.
+That response is the trust boundary, and a second browser-side path to the same two fields would be
+a second source of truth for no gain.
+
+Two alternatives were considered and rejected. A **public select policy** does not work: RLS is
+per-row, not per-column, so "let anyone read just the title and mode" is not expressible without
+exposing `owner_id` for every room and making the table enumerable. A **`security definer` view or
+RPC** works but is a second privileged path to data the session endpoint must fetch anyway, and
+`get_advisors` flags it.
+
+The product consequence is accepted: **Home's "Join by link" does not preview the class.** A bogus
+id comes back as a 404 with a sentence, before VideoSDK is contacted.
+
+Listing your own classes *does* go straight to Supabase under RLS. That is what the owner-scoped
+select policy is for, and using it on the real path means a mistake in that policy shows up on
+Home instead of hiding behind the service role forever.
+
+## Session verification is `getUser`, not a local signature check
+
+`api/_lib/supabase.ts` verifies the access token with `auth.getUser(token)` on the service-role
+client rather than verifying the JWT signature locally.
+
+Local verification proves a token was **signed**, not that the session still **exists**. A
+signed-out or deleted user's unexpired access token would still mint a teacher token, and no test
+would show it. Verifying locally would also mean shipping a JWKS fetcher, a cache and key rotation
+into a serverless function. The cost is one round trip per join, which happens at most once every
+ten minutes.
+
+If this ever becomes hot, the fix is `getClaims()` against a cached JWKS - not a hand-rolled HS256
+verify.
+
+## The display name is client-chosen, and is not identity
+
+Magic link gives an email and no name, so Precall asks for one, prefilled from the email's local
+part. The field sits **outside** every per-state block on that screen: the blocked and unavailable
+paths never render the granted block, so a name asked for only in there would be skipped by exactly
+the people who most need to be identifiable in the room.
+
+A student can therefore type any name they like. That is fine and it is worth being plain about:
+**the name is not a security boundary, the role is.** Step 7's knock queue shows the name, and it
+should not be mistaken for an identity.
+
+## VideoSDK token payload details that are not cosmetic
+
+- **`version: 2` is required** for `roomId` and `participantId` scoping to be honoured at all.
+  Without it those fields are ignored and every token is effectively a skeleton key.
+- **`roles` is deliberately absent.** `crawler` is REST-only and `rtc` is meeting-only, so setting
+  either splits one token into two. Omitting it lets the same signer create a room and join one.
+- **`participantId` is the Supabase user id**, so it is stable across reloads and unique per
+  person. With `version: 2` this pins one seat per account: the same login in two tabs collides.
+  That is intended, and it is why testing this properly needs two real accounts.
+- **`POST /v2/rooms` returns `roomId`**, not `meetingId`, and `Authorization` carries the raw JWT
+  with **no `Bearer` prefix**.
+- **`autoCloseConfig` is not sent at all.** The docs name the enum `session-ends`; the live API
+  reports `session-end` back on a room created without one. Rather than guess, we leave it at the
+  account default, which already ends the session when the last participant leaves.
+- **Values are trimmed when read.** `VIDEOSDK_API_KEY` in this repo's `.env` had a trailing space,
+  which signs a token the API rejects with *"'apikey' provided in the token is empty or invalid"* -
+  a message that blames the key rather than the whitespace.
+
+## Local development runs `vercel dev`, on port 3000
+
+`pnpm dev` is `vercel dev`, which serves the SPA and `api/` from one origin. Plain `vite` has no
+`/api` at all, so a sign-in there fails on a request that returns `index.html` instead of JSON -
+`apiPost` detects that shape and says so by name rather than surfacing a parse error. `pnpm
+dev:vite` remains for pure UI work.
+
+This is why the Supabase redirect allowlist must contain `http://localhost:3000/**` and **not**
+5173: allow-listing 5173 invites someone to run the wrong dev server and lose an hour.
+
+`vercel.json`'s SPA rewrite excludes the API with a negative lookahead. Without it every function
+call returns `index.html` with a 200.
+
+## Signing in during development, without the email
+
+Supabase's built-in sender is testing-only and rate-limited to a handful of messages an hour for
+the whole project - roughly one teacher and one student sign-in, with a typo costing the hour.
+
+`scripts/dev-session.mjs <email>` skips it: `auth.admin.generateLink({ type: 'magiclink' })` under
+the service role returns both an `action_link` and a `hashed_token`, and `auth.verifyOtp({ type:
+'magiclink', token_hash })` redeems the hash for a real session immediately. Two accounts, no email.
+
+This is the same mechanism step 10's Playwright setup needs, since a test cannot click an emailed
+link. **One caveat to carry there:** under PKCE the code verifier lives in the localStorage of the
+browser that requested the link, so a `generateLink` URL opened in a fresh automated context has no
+verifier and the exchange fails. The test will need either `flowType: 'implicit'` or a seeded
+`storageState` - which is why `/auth/callback` is a real route that depends on nothing existing
+only in the requesting tab.
+
+## Where VideoRail went
+
+`src/components/VideoRail.tsx` was deleted with `/room`, its only importer. It carried the rail cap
+and the **"+N" overflow chip**, which the live rail in `LiveClassroom` does not have - a rail is not
+a plan for forty students. That behaviour is recorded here rather than kept alive as dead code;
+port it when the live rail gets a cap.

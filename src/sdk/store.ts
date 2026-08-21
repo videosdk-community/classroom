@@ -2,6 +2,7 @@ import { warn } from './log'
 import type {
   EntryDecision,
   EntryRequest,
+  LeaveReason,
   ParticipantView,
   RoomMessage,
   RoomSnapshot,
@@ -30,6 +31,7 @@ const INITIAL: RoomSnapshot = {
   whiteboard: { url: null, inFlight: false, error: null },
   entryQueue: [],
   lastEntryDecision: null,
+  leaveReason: null,
   topics: {},
   lastError: null,
 }
@@ -52,7 +54,7 @@ export interface RoomActions {
   askToUnmute: (id: string) => void
   startWhiteboard: () => Promise<void>
   stopWhiteboard: () => Promise<void>
-  respondEntry: (id: string, allow: boolean) => void
+  respondEntry: (id: string, allow: boolean) => Promise<void>
   publish: (topic: string, text: string, persist: boolean) => Promise<void>
 }
 
@@ -109,8 +111,10 @@ export function createRoomStore() {
       if (actions) await actions.stopWhiteboard()
       else notReady('stopWhiteboard')()
     },
-    respondEntry: (id, allow) =>
-      actions ? actions.respondEntry(id, allow) : notReady('respondEntry')(),
+    respondEntry: async (id, allow) => {
+      if (actions) await actions.respondEntry(id, allow)
+      else notReady('respondEntry')()
+    },
     publish: async (topic, text, persist) => {
       if (actions) await actions.publish(topic, text, persist)
       else notReady('publish')()
@@ -145,6 +149,7 @@ export function createRoomStore() {
     setActiveSpeaker: (activeSpeakerId: string | null) => commit({ activeSpeakerId }),
     setRecording: (isRecording: boolean) => commit({ isRecording }),
     setError: (lastError: { code: number; message: string } | null) => commit({ lastError }),
+    setLeaveReason: (leaveReason: LeaveReason | null) => commit({ leaveReason }),
 
     setWhiteboard(patch: Partial<RoomSnapshot['whiteboard']>) {
       const next = { ...snapshot.whiteboard, ...patch }
@@ -195,11 +200,16 @@ export function createRoomStore() {
     },
 
     // ---- lobby ----------------------------------------------------------
-    addEntryRequest(row: EntryRequest, closures: { allow: () => void; deny: () => void }) {
-      entryClosures.set(row.participantId, closures)
+    addEntryRequest(row: EntryRequest, closures?: { allow: () => void; deny: () => void }) {
+      /* Optional, because a failed respondEntry restores the display row after
+         its closures have already been consumed. A row with no closure is not
+         useless - respondEntry(id, decision) still addresses it by id. */
+      if (closures) entryClosures.set(row.participantId, closures)
       if (snapshot.entryQueue.some((r) => r.participantId === row.participantId)) return
       commit({ entryQueue: [...snapshot.entryQueue, row] })
     },
+    getEntryRequest: (id: string) =>
+      snapshot.entryQueue.find((r) => r.participantId === id),
     takeEntryClosures(id: string) {
       const c = entryClosures.get(id)
       entryClosures.delete(id)

@@ -21,14 +21,25 @@ export {
   useWhiteboard,
   useEntryQueue,
   useEntryDecision,
+  useLeaveReason,
   useRoomError,
   useTopic,
   useRoomActions,
   useTrack,
 } from './hooks'
 
+/* Leave-reason codes, as values. Feature code compares against these rather
+   than against bare numbers, so the meaning of 1011 lives in one place. */
+export {
+  LEAVE_ROOM_CLOSE,
+  LEAVE_MEETING_END_API,
+  LEAVE_DUPLICATE_PARTICIPANT,
+  LEAVE_MANUAL,
+} from './types'
+
 export type {
   RoomStatus,
+  LeaveReason,
   ParticipantView,
   EntryRequest,
   EntryDecision,

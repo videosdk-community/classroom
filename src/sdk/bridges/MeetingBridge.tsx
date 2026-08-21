@@ -14,13 +14,20 @@ import type { RoomStatus } from '../types'
    MaxListenersExceededWarning per event name. Anyone who benchmarks this and
    finds "nothing" is measuring the wrong thing; do not remove the bridge. */
 
+/* The five states js-sdk actually emits, from
+   constants/meetingConnectionState.js.
+
+   This map used to carry CLOSING and CLOSED, which come from the react-sdk
+   typings and are emitted by nothing, and to omit RECONNECTING, which IS
+   emitted - react-sdk special-cases it in its own reducer. The result was a
+   reconnect logging "unrecognised meeting state" and leaving the last status
+   on screen. On the lobby's waiting screen that reads as a freeze. */
 const STATUS: Record<string, RoomStatus> = {
   CONNECTING: 'connecting',
   CONNECTED: 'connected',
+  RECONNECTING: 'reconnecting',
   FAILED: 'failed',
   DISCONNECTED: 'disconnected',
-  CLOSING: 'closed',
-  CLOSED: 'closed',
 }
 
 export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeacher: boolean }) {
@@ -28,7 +35,17 @@ export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeache
     onMeetingJoined() {
       store.setStatus('connected')
     },
-    onMeetingLeft() {
+    /* The leave REASON is the payload, and it is the only room-ended signal
+       the SDK has - there is no host-left and no room-ended event anywhere.
+       js-sdk's leaveReason table gives 1006 the teacher closing the room, 1009
+       the end API, 1011 the same account joining from another tab, and 1101
+       our own leave() call. Discarding it would leave the app unable to tell
+       "the class ended" from "you were evicted" from "you were declined". */
+    onMeetingLeft(reason?: { code?: number; message?: string }) {
+      store.setLeaveReason({
+        code: Number(reason?.code ?? 0),
+        message: reason?.message ?? 'You left the class.',
+      })
       store.setStatus('disconnected')
     },
     onMeetingStateChanged({ state }) {
@@ -63,7 +80,12 @@ export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeache
        knowingly overruled, and normaliseEntryResponded handles both. */
     onEntryResponded: ((...args: unknown[]) => {
       const decision = normaliseEntryResponded(...args)
-      if (decision) store.setEntryDecision(decision)
+      if (!decision) return
+      store.setEntryDecision(decision)
+      /* This event reaches EVERY allow_join holder, not just whoever clicked -
+         so a second teacher's decision clears the row here too, and a queue
+         cannot show a student who has already been answered. */
+      store.removeEntryRequest(decision.participantId)
     }) as never,
     onError({ code, message }) {
       const numeric = Number(code)
@@ -117,20 +139,37 @@ export function MeetingBridge({ store, isTeacher }: { store: RoomStore; isTeache
       },
       startWhiteboard: async () => {},
       stopWhiteboard: async () => {},
-      respondEntry: (id, allow) => {
+      /* Optimistic, and it puts the row back if the decision fails.
+
+         The row used to be removed unconditionally, so a rejected admit made
+         the student vanish from the teacher's screen while still knocking. */
+      respondEntry: async (id, allow) => {
+        const row = store.getEntryRequest(id)
         const closures = store.takeEntryClosures(id)
-        if (closures) {
-          if (allow) closures.allow()
-          else closures.deny()
-        } else {
-          /* respondEntry(id, decision) exists on useMeeting, so a lost closure
-             is not necessarily fatal - unlike what plan.md assumes. Its own
-             typings disagree on the decision type (string here, boolean in
-             meeting.d.ts), so this path is a fallback and not the default. */
-          warn('no entry closure for participant, falling back to respondEntry', id)
-          ref.current.respondEntry(id, allow as unknown as string)
-        }
         store.removeEntryRequest(id)
+        try {
+          if (closures) {
+            await (allow ? closures.allow() : closures.deny())
+          } else {
+            /* respondEntry(id, decision) addresses a decision by participant
+               id, so a lost closure is not necessarily fatal.
+
+               The decision is a STRING, and four declarations disagree about
+               it: react-sdk index.d.ts says `string`, react-sdk meeting.d.ts
+               says `boolean`, the generated typedoc demonstrates
+               "allow"/"deny". js-sdk's meeting.d.ts says "allowed" | "denied",
+               and it wins - RoomClient.respondEntry forwards the value to the
+               socket unmodified, and the SDK's own allow()/deny() closures are
+               built as respondEntry(id, "allowed") / (id, "denied"). Sending a
+               boolean here, as this line used to, put `true` on the wire. */
+            warn('no entry closure for participant, falling back to respondEntry', id)
+            await ref.current.respondEntry(id, allow ? 'allowed' : 'denied')
+          }
+        } catch (err) {
+          warn('respondEntry failed, restoring the queue row', id, err)
+          if (row) store.addEntryRequest(row)
+          store.setError({ code: 0, message: 'That decision did not go through. Try again.' })
+        }
       },
       publish: async () => {},
     })

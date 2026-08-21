@@ -184,11 +184,21 @@ export function Home() {
                   <span className="truncate text-base font-medium text-ink">{room.title}</span>
                   <span className="truncate text-sm text-ink-tertiary">{room.roomId}</span>
                 </div>
-                <Badge tone={room.mode === 'lecture' ? 'primary' : 'neutral'}>{room.mode}</Badge>
-                <Button variant="text" onClick={() => void copy(room.roomId)}>
-                  {copied === room.roomId ? 'Copied' : 'Copy link'}
-                </Button>
-                <Button onClick={() => navigate(`/c/${room.roomId}`)}>Open</Button>
+                {room.endedAt ? (
+                  <Badge tone="neutral">ended</Badge>
+                ) : (
+                  <Badge tone={room.mode === 'lecture' ? 'primary' : 'neutral'}>{room.mode}</Badge>
+                )}
+                {/* An ended room cannot be joined, so offering Open and a
+                    link that both dead-end is worse than offering neither. */}
+                {!room.endedAt && (
+                  <>
+                    <Button variant="text" onClick={() => void copy(room.roomId)}>
+                      {copied === room.roomId ? 'Copied' : 'Copy link'}
+                    </Button>
+                    <Button onClick={() => navigate(`/c/${room.roomId}`)}>Open</Button>
+                  </>
+                )}
               </li>
             ))}
           </ul>

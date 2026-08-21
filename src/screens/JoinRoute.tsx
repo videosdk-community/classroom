@@ -42,8 +42,16 @@ export function JoinRoute() {
     return (
       <div className="flex h-full items-center justify-center bg-canvas p-6">
         <div className="flex w-full max-w-[420px] flex-col gap-4">
-          <Alert tone={ended ? 'info' : 'danger'} title={ended ? 'This class has ended' : 'Cannot open this class'}>
-            {error?.message ?? 'Something went wrong.'}
+          <Alert
+            tone={ended ? 'info' : 'danger'}
+            title={ended ? 'This class has ended' : 'Cannot open this class'}
+          >
+            {/* The server's sentence IS the title in the ended case, so
+                repeating it verbatim underneath reads as a bug. Say the next
+                useful thing instead. */}
+            {ended
+              ? 'The teacher closed it. Ask for a new link if it is running again.'
+              : (error?.message ?? 'Something went wrong.')}
           </Alert>
           <div className="flex gap-2">
             {!ended && !missing && (

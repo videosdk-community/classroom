@@ -24,6 +24,13 @@ export interface RoomProviderProps {
   meetingId: string
   token: string
   name: string
+  /* Derived from the Supabase user id and already baked into the token, so
+     the two agree. Passed separately because the store needs it before the
+     SDK reports a local participant. */
+  participantId: string
+  /* Server-derived, from room ownership. It decides which controls are drawn
+     and nothing more - the real enforcement is allow_mod inside the token. */
+  isTeacher: boolean
   micEnabled: boolean
   camEnabled: boolean
   customCameraVideoTrack?: MediaStream
@@ -35,6 +42,8 @@ export function RoomProvider({
   meetingId,
   token,
   name,
+  participantId,
+  isTeacher,
   micEnabled,
   camEnabled,
   customCameraVideoTrack,
@@ -50,6 +59,7 @@ export function RoomProvider({
       config={{
         meetingId,
         name,
+        participantId,
         /* Declared non-optional in the typings, so all three are always
            passed even where a default would do. */
         micEnabled,
@@ -61,7 +71,7 @@ export function RoomProvider({
       joinWithoutUserInteraction
     >
       <RoomStoreContext.Provider value={store}>
-        <MeetingBridge store={store} />
+        <MeetingBridge store={store} isTeacher={isTeacher} />
         <ParticipantBridges store={store} />
         <WhiteboardBridge store={store} />
         <PubSubBridge topic={CHAT_TOPIC} store={store} persist={false} />

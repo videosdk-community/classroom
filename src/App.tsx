@@ -1,102 +1,30 @@
-import { useState } from 'react'
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { Classroom } from './screens/Classroom'
-import { LiveClassroom } from './screens/LiveClassroom'
-import { Precall } from './screens/Precall'
 import { SignIn } from './screens/SignIn'
 import { AuthCallback } from './screens/AuthCallback'
 import { Home } from './screens/Home'
+import { JoinRoute } from './screens/JoinRoute'
 import { RequireAuth } from './auth/RequireAuth'
-import { RoomProvider, devSession } from './sdk'
-import type { JoinDetails } from './screens/Precall'
-import { suggestedName } from './auth/context'
-import { useAuth } from './auth/context'
 import type { ClassMode } from './domain/classroom'
 
 /* Routes.
 
-   Two classroom routes for now, which is a step-4 arrangement and not the
-   shipped shape:
+   /                signed-in home: start a class, join one, reopen one
+   /signin          magic link request
+   /auth/callback   where the link lands
+   /c/:roomId       the one way into a class
 
-   /room  fixtures only, no SDK, no network. The step-3 checkpoint screen, and
-          still the fastest way to judge the shell at a window size without
-          burning meeting minutes.
-   /live  the same shell wired to a real meeting.
+   /room is the last piece of scaffolding: fixtures only, no SDK and no
+   network, still the fastest way to judge the shell at a window size without
+   burning meeting minutes. It goes when the shell stops changing.
 
-   Mode is a query param in both, purely so each shape can be looked at without
-   a database. In the shipped app it is a room column read once at join, so the
-   param is scaffolding and goes at step 6 along with /room itself. */
-
-function useMode(): ClassMode {
-  const [params] = useSearchParams()
-  return params.get('mode') === 'lecture' ? 'lecture' : 'class'
-}
+   Note what the class URL does NOT carry. No mode, no role - both come from
+   api/session.ts, which derives them from who owns the room. */
 
 function FixtureRoute() {
   const [params] = useSearchParams()
-  return <Classroom mode={useMode()} showKeepout={params.get('keepout') === '1'} />
-}
-
-function LiveRoute() {
-  const mode = useMode()
-  const dev = devSession()
-
-  if (!dev) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
-        <span className="text-xl font-semibold text-ink">No meeting token</span>
-        <span className="max-w-[420px] text-base text-ink-secondary">
-          Run <code className="text-ink">node scripts/mint-dev-token.mjs</code> to create a room and
-          write the dev token, then restart the dev server. Step 6 replaces this with a real session.
-        </span>
-      </div>
-    )
-  }
-
-  return <PrecallThenRoom mode={mode} meetingId={dev.meetingId} token={dev.token} />
-}
-
-type Joined = JoinDetails
-
-/* Precall and the room are SIBLINGS, never nested.
-
-   MeetingProvider reads its config on first mount and ignores later changes -
-   reinitialiseMeetingOnConfigChange defaults to false - so precall tracks only
-   take effect if they exist before the provider mounts. Rendering precall
-   inside a mounted provider would make the handoff a silent no-op and send
-   someone hunting through the SDK for a bug that is in the tree shape. */
-function PrecallThenRoom({
-  mode,
-  meetingId,
-  token,
-}: {
-  mode: ClassMode
-  meetingId: string
-  token: string
-}) {
-  const [joined, setJoined] = useState<Joined | null>(null)
-  const { user } = useAuth()
-  const suggested = suggestedName(user)
-
-  if (!joined) {
-    return (
-      <Precall suggestedName={suggested} onJoin={setJoined} />
-    )
-  }
-
-  return (
-    <RoomProvider
-      meetingId={meetingId}
-      token={token}
-      name={joined.name}
-      micEnabled={joined.micOn}
-      camEnabled={joined.camOn}
-      customCameraVideoTrack={joined.tracks.camera}
-      customMicrophoneAudioTrack={joined.tracks.microphone}
-    >
-      <LiveClassroom mode={mode} />
-    </RoomProvider>
-  )
+  const mode: ClassMode = params.get('mode') === 'lecture' ? 'lecture' : 'class'
+  return <Classroom mode={mode} showKeepout={params.get('keepout') === '1'} />
 }
 
 export default function App() {
@@ -112,8 +40,15 @@ export default function App() {
       />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
+        path="/c/:roomId"
+        element={
+          <RequireAuth>
+            <JoinRoute />
+          </RequireAuth>
+        }
+      />
       <Route path="/room" element={<FixtureRoute />} />
-      <Route path="/live" element={<LiveRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

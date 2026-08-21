@@ -49,7 +49,7 @@ function toPerson(p: ParticipantView): Person {
   }
 }
 
-export function LiveClassroom({ mode }: { mode: ClassMode }) {
+export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string }) {
   const status = useRoomStatus()
   const ids = useParticipantIds()
   const views = useParticipantViews()
@@ -72,6 +72,9 @@ export function LiveClassroom({ mode }: { mode: ClassMode }) {
   }
 
   const self = useParticipantView(localId ?? '')
+  /* Server-derived, seeded onto the local row by the seam. This is what makes
+     mute-all, the board toggle and end-class disappear for a student. */
+  const isTeacher = self?.isTeacher ?? false
 
   if (status !== 'connected') {
     return (
@@ -86,7 +89,7 @@ export function LiveClassroom({ mode }: { mode: ClassMode }) {
 
   return (
     <div className="flex h-full flex-col bg-canvas">
-      <TopBar title="Calculus II" mode={mode} recording={recording} elapsed="live" />
+      <TopBar title={title} mode={mode} recording={recording} elapsed="live" />
 
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
@@ -112,7 +115,7 @@ export function LiveClassroom({ mode }: { mode: ClassMode }) {
             handRaised={false}
             handsEnabled={handsEnabled}
             onToggleHand={() => {}}
-            isTeacher
+            isTeacher={isTeacher}
             boardOn={Boolean(whiteboard.url)}
             boardBusy={whiteboard.inFlight}
             onToggleBoard={() => {

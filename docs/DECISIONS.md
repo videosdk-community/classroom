@@ -80,12 +80,34 @@ Three rules the implementation cannot get wrong:
   arguments while the shipped `.d.ts` declares a single object. Normalise both at
   the seam.
 
-**A hole we cannot close:** if the teacher reloads mid-knock, the allow/deny
-closures die with their event and the student is stranded in silence, with no
-event ever arriving. Nothing in the SDK fixes this. The whole mitigation is
-escalating copy plus an "Ask again" button, and it is written down here rather
-than pretended away. The wait never auto-navigates - a student about to be
-admitted at second 95 must not be ejected at 90.
+**The teacher-reload hole, measured rather than assumed.** Driven in two
+browsers on 2026-08-21, with a temporary probe hook that was not committed.
+
+What actually happens when a teacher reloads while somebody is knocking:
+
+- `onEntryRequested` **does not re-fire**. The rebuilt page has an empty queue
+  and the student is invisible on it.
+- The student is **still knocking** - they never left, and the server still
+  holds the request.
+- `respondEntry(participantId, "allowed")` **still admits them**, called with
+  no closure anywhere in the process. It resolved, and the student landed in
+  the class.
+
+So the hole is narrower than it was written up as. The teacher has not lost the
+ability to answer - they have lost the knowledge of **who is asking**. Answering
+by id works; there is simply no id on screen.
+
+Closing it properly needs the knock recorded somewhere that survives a reload,
+and **pubsub cannot be that place**: a knocking student is not in the meeting,
+so they cannot publish and the persisted-topic trick that carries class
+controls does not reach them. It would have to be a row written by an endpoint
+before the join. That is real product surface and it is not step 7.
+
+Until then the mitigation is unchanged - escalating copy plus "Ask again", both
+of which work, and a student who asks again produces a fresh `onEntryRequested`
+that the rebuilt queue does show. The wait never auto-navigates: verified out to
+95 seconds, the copy escalates at 20s and 60s and the URL never changes. A
+student about to be admitted at second 95 must not be ejected at 90.
 
 ## A teacher can mute but cannot force-unmute
 
@@ -169,10 +191,25 @@ the board started would never receive the URL. Probed in three browsers on 2026-
 reached both an existing participant and one who joined afterwards. The server replays the event on
 join. Settled, and not a reason to add a pubsub fallback.
 
-**`respondEntry(id, decision)` exists on `useMeeting`**, so an admit or deny is addressable by
-participant id and the allow/deny closures are not the only handle. It needs probing before being
-relied on - the typings disagree with themselves on whether `decision` is a string or a boolean -
-but it may soften the teacher-reload hole described above.
+**`respondEntry(id, decision)` works, and `decision` is a string.** Four declarations disagree:
+react-sdk `index.d.ts:1444` says `string`, react-sdk `meeting.d.ts:119` says `boolean` with
+`true`/`false` in its doc comment, and the generated typedoc HTML demonstrates `"allow"`/`"deny"`.
+**js-sdk's `meeting.d.ts` says `"allowed" | "denied"` and it is the one that is right** -
+`RoomClient.respondEntry` forwards the value to the socket completely unmodified, and the SDK's own
+`allow()` / `deny()` closures are built as `respondEntry(id, "allowed")` and `(id, "denied")`.
+
+When four typings disagree, the bundle decides. Probed end to end: a decision by participant id
+admitted a student after the teacher had reloaded and every closure was gone.
+
+**There is no host-left, room-ended or waiting-room event.** All 69 react-sdk event keys and every
+js-sdk `EV_*` constant were listed to confirm it. The only room-ended signal is the `code` on
+`onMeetingLeft`'s reason - 1006 the room closing, 1009 the end API, 1011 the same account joining
+from another tab, 1101 our own `leave()`. Discarding that payload, as this app used to, leaves it
+unable to tell any of those apart.
+
+**`RECONNECTING` is emitted and is not in the react-sdk typings.** They declare `CLOSING` and
+`CLOSED` instead, and the bundle emits neither. A status map written from the typings drops the one
+state that actually happens.
 
 ## Role is derived from room ownership, server-side
 

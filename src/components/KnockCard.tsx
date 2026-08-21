@@ -31,7 +31,7 @@ export function KnockCard({ waiting, onRespond, onSeeAll }: KnockCardProps) {
 
   return (
     <div
-      className="absolute right-9 top-9 z-20 w-[268px] overflow-hidden rounded-xl border border-line-strong bg-card"
+      className="absolute right-9 top-9 z-20 w-[312px] overflow-hidden rounded-xl border border-line-strong bg-card"
       style={{ boxShadow: 'var(--elevation-popover)' }}
     >
       <div className="px-3 pb-1 pt-2 text-xs uppercase tracking-wide text-ink-tertiary">

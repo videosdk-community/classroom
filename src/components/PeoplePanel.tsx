@@ -105,7 +105,10 @@ export function PeoplePanel({
           )}
 
           {isTeacher && p.id !== selfId ? (
-            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            /* hidden rather than opacity-0: an invisible row of buttons still
+               takes its width, and in a 320px panel that truncated every name
+               to three characters whether or not anyone was hovering. */
+            <div className="hidden items-center gap-1 group-hover:flex group-focus-within:flex">
               {p.handRaised && (
                 <RowAction label="Lower hand" onClick={() => onLowerHand(p.id)}>
                   Lower

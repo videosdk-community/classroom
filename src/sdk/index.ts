@@ -40,6 +40,3 @@ export { usePrecall } from './media/usePrecall'
 export type { PrecallState, PrecallTracks } from './media/usePrecall'
 export type { MediaDeviceOption } from './media/devices'
 export type { DoorState } from './media/permissions'
-
-export { devSession } from './dev/devToken'
-export type { DevSession } from './dev/devToken'

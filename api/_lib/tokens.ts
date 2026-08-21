@@ -2,8 +2,8 @@ import { createHmac } from 'node:crypto'
 
 /* VideoSDK meeting tokens, signed HS256 with the account secret.
 
-   Lifted from scripts/mint-dev-token.mjs, which proved the technique against
-   the live API before this file existed. node:crypto only - a JWT this shape
+   Lifted from the step-4 dev-token script, since deleted, which proved the
+   technique against the live API before this file existed. node:crypto only - a JWT this shape
    does not earn a dependency.
 
    Two payload rules that are not cosmetic:

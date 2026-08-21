@@ -5,6 +5,8 @@ import { LiveClassroom } from './screens/LiveClassroom'
 import { Precall } from './screens/Precall'
 import { SignIn } from './screens/SignIn'
 import { AuthCallback } from './screens/AuthCallback'
+import { Home } from './screens/Home'
+import { RequireAuth } from './auth/RequireAuth'
 import { RoomProvider, devSession, type PrecallTracks } from './sdk'
 import type { ClassMode } from './domain/classroom'
 
@@ -101,11 +103,19 @@ function PrecallThenRoom({
 export default function App() {
   return (
     <Routes>
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Home />
+          </RequireAuth>
+        }
+      />
       <Route path="/signin" element={<SignIn />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/room" element={<FixtureRoute />} />
       <Route path="/live" element={<LiveRoute />} />
-      <Route path="*" element={<Navigate to="/room" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

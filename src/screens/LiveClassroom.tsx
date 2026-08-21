@@ -4,7 +4,7 @@ import { KnockCard } from '../components/KnockCard'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
-import { LiveTile } from '../components/LiveTile'
+import { VideoRail } from '../components/VideoRail'
 import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
 import { useMediaQuery } from '../lib/useMediaQuery'
@@ -90,6 +90,11 @@ export function LiveClassroom({
 
   const self = useParticipantView(localId ?? '')
 
+  /* Server-derived, so this finds the real teacher rather than whoever
+     claimed to be one. Null until their row arrives - a class can be opened
+     before the teacher's own participant event has landed. */
+  const teacherId = views.find((p) => p.isTeacher)?.id ?? null
+
   /* The knock queue. Only a token holding allow_mod ever receives these, so a
      student's queue is permanently empty and the surfaces below simply never
      appear for them. */
@@ -102,13 +107,12 @@ export function LiveClassroom({
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
           {mode === 'class' && (
-            <div className="h-[112px] shrink-0 overflow-x-auto border-b border-line">
-              <div className="mx-auto flex h-full w-max items-center gap-2 px-3">
-                {ids.map((id) => (
-                  <LiveTile key={id} id={id} selfId={localId} className="h-[96px] w-[128px] shrink-0" />
-                ))}
-              </div>
-            </div>
+            <VideoRail
+              ids={ids}
+              selfId={localId}
+              teacherId={teacherId}
+              onSeeAll={() => setPanel('people')}
+            />
           )}
 
           <div className="min-h-0 flex-1 p-6">

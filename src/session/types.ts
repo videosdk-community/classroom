@@ -12,5 +12,9 @@ export interface RoomSession {
      the permissions array inside `token`, and nowhere else. */
   role: 'teacher' | 'student'
   participantId: string
+  /* The teacher's participantId, derived server-side from room ownership.
+     Everyone gets it, because every client needs to agree on who is onstage
+     in Lecture and who carries the teacher label in the roster. */
+  teacherParticipantId: string
   expiresIn: number
 }

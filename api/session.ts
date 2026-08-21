@@ -79,6 +79,16 @@ export default handle(async (req: VercelRequest, res: VercelResponse) => {
        moderation action on this field alone. */
     role: isOwner ? 'teacher' : 'student',
     participantId: user.id,
+    /* Which seat in the meeting belongs to the teacher.
+
+       Lecture puts the teacher onstage, and every client has to agree on who
+       that is. Nothing the SDK exposes lets one client derive another's role,
+       so the alternative was announcing it over pubsub - broadcast state a
+       crafted publish could claim. This comes from room ownership instead, on
+       the same lookup that already decided the permissions, so it cannot be
+       forged. It leaks nothing new either: participant ids are visible to
+       everyone in the meeting already, and this only names one of them. */
+    teacherParticipantId: room.owner_id,
     expiresIn: TTL_SECONDS,
   })
 })

@@ -11,6 +11,12 @@ import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import {
   CHAT_TOPIC,
+  CLASS_CONTROLS_TOPIC,
+  HANDS_TOPIC,
+  encodeControls,
+  encodeHand,
+  useClassControls,
+  useRaisedHands,
   useIsRecording,
   useLocalId,
   useMediaRequest,
@@ -22,6 +28,7 @@ import {
   useRoomActions,
   useTopic,
   useWhiteboard,
+  type ClassControls,
   type EntryRequest,
   type ParticipantView,
 } from '../sdk'
@@ -76,8 +83,22 @@ export function LiveClassroom({
 
   const [panel, setPanel] = useState<PanelKind>('chat')
   const [moreOpen, setMoreOpen] = useState(false)
-  const [chatEnabled, setChatEnabled] = useState(true)
-  const [handsEnabled, setHandsEnabled] = useState(true)
+
+  /* Class state is not local state. Both toggles used to be useState here,
+     which meant a teacher turning chat off changed nothing on any other
+     screen. They are folded from a persisted pubsub topic now, so a student
+     already in the room, one who joins later, and one who reloads all read
+     the same value. */
+  const controls = useClassControls()
+  const raisedHands = useRaisedHands()
+  const handRaised = localId ? raisedHands.has(localId) : false
+
+  /* A full snapshot per publish, and no optimistic local update: the teacher
+     sees the toggle move when their own message comes back, which is the same
+     moment everyone else sees it. */
+  const setControls = (patch: Partial<ClassControls>) => {
+    void actions.publish(CLASS_CONTROLS_TOPIC, encodeControls({ ...controls, ...patch }))
+  }
 
   const overlayPanel = useMediaQuery(`(max-width: ${PANEL_OVERLAY_BREAKPOINT - 1}px)`)
   const [wasOverlay, setWasOverlay] = useState(overlayPanel)
@@ -141,9 +162,12 @@ export function LiveClassroom({
             camOn={self?.camOn ?? false}
             onToggleMic={actions.toggleMic}
             onToggleCam={actions.toggleWebcam}
-            handRaised={false}
-            handsEnabled={handsEnabled}
-            onToggleHand={() => {}}
+            handRaised={handRaised}
+            handsEnabled={controls.handsEnabled}
+            onToggleHand={() => {
+              if (!localId) return
+              void actions.publish(HANDS_TOPIC, encodeHand(localId, !handRaised))
+            }}
             isTeacher={isTeacher}
             boardOn={Boolean(whiteboard.url)}
             boardBusy={whiteboard.inFlight}
@@ -152,9 +176,9 @@ export function LiveClassroom({
               else void actions.startWhiteboard()
             }}
             onMuteAll={actions.muteEveryoneElse}
-            chatEnabled={chatEnabled}
-            onToggleChatEnabled={setChatEnabled}
-            onToggleHandsEnabled={setHandsEnabled}
+            chatEnabled={controls.chatEnabled}
+            onToggleChatEnabled={(next) => setControls({ chatEnabled: next })}
+            onToggleHandsEnabled={(next) => setControls({ handsEnabled: next })}
             panel={panel}
             onSetPanel={setPanel}
             participantCount={ids.length}
@@ -186,7 +210,7 @@ export function LiveClassroom({
               mine: m.senderId === localId,
               at: '',
             }))}
-            chatEnabled={chatEnabled || isTeacher}
+            chatEnabled={controls.chatEnabled || isTeacher}
             onSend={(text) => actions.publish(CHAT_TOPIC, text)}
             overlay={overlayPanel}
             onHide={() => setPanel(null)}

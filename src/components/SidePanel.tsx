@@ -5,6 +5,7 @@ import { RoomIcon } from './icons'
 import { cn } from '../design/ui'
 import type { PanelKind } from './ControlBar'
 import type { ChatMessage, ClassMode, Person } from '../domain/classroom'
+import type { EntryRequest } from '../sdk'
 
 /* The right-hand panel, 320px.
 
@@ -25,6 +26,9 @@ export interface SidePanelProps {
   self: Person
   people: Person[]
   messages: ChatMessage[]
+  /** Students knocking. Empty for anyone without allow_mod. */
+  waiting: readonly EntryRequest[]
+  onRespond: (id: string, allow: boolean) => void
   chatEnabled: boolean
   /** Once the window is too narrow for both, the panel floats over the stage
       instead of taking width from it, so the board never gets squeezed below
@@ -40,6 +44,8 @@ export function SidePanel({
   self,
   people,
   messages,
+  waiting,
+  onRespond,
   chatEnabled,
   overlay,
   onHide,
@@ -80,7 +86,12 @@ export function SidePanel({
       {panel === 'chat' ? (
         <ChatPanel messages={messages} enabled={chatEnabled} />
       ) : (
-        <PeoplePanel people={people} selfId={self.id} />
+        <PeoplePanel
+          people={people}
+          selfId={self.id}
+          waiting={waiting}
+          onRespond={onRespond}
+        />
       )}
     </aside>
   )

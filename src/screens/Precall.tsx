@@ -25,10 +25,20 @@ export interface PrecallProps {
   title?: string
   /** Prefilled name, usually the local part of the signed-in email. */
   suggestedName?: string
+  /** Why someone is looking at this screen a second time. Set only when a
+      knock was answered with a no, or ran out of patience - without it, being
+      returned to a device picker reads as the app losing its place. */
+  notice?: string
   busy?: boolean
 }
 
-export function Precall({ onJoin, title, suggestedName = '', busy = false }: PrecallProps) {
+export function Precall({
+  onJoin,
+  title,
+  suggestedName = '',
+  notice,
+  busy = false,
+}: PrecallProps) {
   const p = usePrecall()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [name, setName] = useState(suggestedName)
@@ -80,6 +90,7 @@ export function Precall({ onJoin, title, suggestedName = '', busy = false }: Pre
         <div className="flex flex-col items-center gap-1">
           <h1 className="text-2xl font-semibold text-ink">Ready to join?</h1>
           {title && <span className="text-base text-ink-secondary">{title}</span>}
+          {notice && <span className="text-base text-ink-tertiary">{notice}</span>}
         </div>
 
         {/* Outside every per-state block on purpose. The blocked and

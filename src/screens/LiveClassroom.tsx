@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BoardStage } from '../components/BoardStage'
+import { KnockCard } from '../components/KnockCard'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
@@ -14,10 +15,11 @@ import {
   useParticipantIds,
   useParticipantView,
   useParticipantViews,
+  useEntryQueue,
   useRoomActions,
-  useRoomStatus,
   useTopic,
   useWhiteboard,
+  type EntryRequest,
   type ParticipantView,
 } from '../sdk'
 
@@ -35,6 +37,10 @@ function hueFor(id: string) {
   return h
 }
 
+/* A stable empty array, so a student's SidePanel does not get a new [] every
+   render and re-render the roster for nothing. */
+const EMPTY_QUEUE: readonly EntryRequest[] = []
+
 function toPerson(p: ParticipantView): Person {
   return {
     id: p.id,
@@ -49,8 +55,19 @@ function toPerson(p: ParticipantView): Person {
   }
 }
 
-export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string }) {
-  const status = useRoomStatus()
+export function LiveClassroom({
+  mode,
+  title,
+  isTeacher,
+}: {
+  mode: ClassMode
+  title: string
+  /* Server-derived, from room ownership, and passed down rather than read off
+     the local participant row. The store's row does carry it, but only once a
+     local participant exists - which is never true for anyone still knocking,
+     and would make this false for a beat after admission. */
+  isTeacher: boolean
+}) {
   const ids = useParticipantIds()
   const views = useParticipantViews()
   const localId = useLocalId()
@@ -72,23 +89,14 @@ export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string 
   }
 
   const self = useParticipantView(localId ?? '')
-  /* Server-derived, seeded onto the local row by the seam. This is what makes
-     mute-all, the board toggle and end-class disappear for a student. */
-  const isTeacher = self?.isTeacher ?? false
 
-  if (status !== 'connected') {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas">
-        <span className="text-xl font-semibold text-ink">
-          {status === 'failed' ? 'Could not join the class' : 'Joining the class'}
-        </span>
-        <span className="text-base text-ink-secondary">{status}</span>
-      </div>
-    )
-  }
+  /* The knock queue. Only a token holding allow_mod ever receives these, so a
+     student's queue is permanently empty and the surfaces below simply never
+     appear for them. */
+  const waiting = useEntryQueue()
 
   return (
-    <div className="flex h-full flex-col bg-canvas">
+    <div className="relative flex h-full flex-col bg-canvas">
       <TopBar title={title} mode={mode} recording={recording} elapsed="live" />
 
       <div className="relative flex min-h-0 flex-1">
@@ -103,8 +111,20 @@ export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string 
             </div>
           )}
 
-          <div className="min-h-0 flex-1 p-6">
+          {/* The board region is the stacking context: iframe underneath,
+              app chrome above. The knock card sits top-right, which step 0
+              measured as free - tldraw's own furniture is top-left (page
+              menu), bottom (toolbar), right edge low down (style panel) and
+              bottom-left (zoom). */}
+          <div className="relative min-h-0 flex-1 p-6">
             <BoardStage boardOn={Boolean(whiteboard.url)} />
+            {isTeacher && (
+              <KnockCard
+                waiting={waiting}
+                onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+                onSeeAll={() => setPanel('people')}
+              />
+            )}
           </div>
 
           <ControlBar
@@ -131,6 +151,7 @@ export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string 
             panel={panel}
             onSetPanel={setPanel}
             participantCount={ids.length}
+            waitingCount={waiting.length}
             moreOpen={moreOpen}
             onSetMoreOpen={setMoreOpen}
             onLeave={actions.leave}
@@ -143,6 +164,8 @@ export function LiveClassroom({ mode, title }: { mode: ClassMode; title: string 
             mode={mode}
             self={toPerson(self)}
             people={views.map(toPerson)}
+            waiting={isTeacher ? waiting : EMPTY_QUEUE}
+            onRespond={(id, allow) => void actions.respondEntry(id, allow)}
             messages={messages.map((m) => ({
               id: m.key,
               who: m.senderName,

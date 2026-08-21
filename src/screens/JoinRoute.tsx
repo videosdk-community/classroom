@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Spinner } from '../design/ui'
-import { LiveClassroom } from './LiveClassroom'
+import { RoomGate, type ExitReason } from './RoomGate'
 import { Precall } from './Precall'
 import { RoomProvider, type PrecallTracks } from '../sdk'
 import { useSession } from '../session/useSession'
@@ -85,10 +85,34 @@ function PrecallThenRoom({
   session: RoomSession
   refresh: () => Promise<RoomSession>
 }) {
+  const navigate = useNavigate()
   const [joined, setJoined] = useState<Joined | null>(null)
   const [fresh, setFresh] = useState<RoomSession>(session)
   const [joining, setJoining] = useState(false)
+  /* Bumped on every re-knock, and used as RoomProvider's key.
+
+     MeetingProvider reads its config once - reinitialiseMeetingOnConfigChange
+     defaults to false - so there is no way to ask again except to build a new
+     provider. The key IS the mechanism; without it "Ask again" silently
+     re-renders the same dead meeting. */
+  const [attempt, setAttempt] = useState(0)
+  const [exit, setExit] = useState<ExitReason | null>(null)
   const { user } = useAuth()
+
+  /* Back to precall rather than straight into a new join.
+
+     leave() stops the tracks handed to the previous provider, so reusing them
+     would give the next attempt a dead camera - a failure that shows up as a
+     black tile and no error at all. Precall re-acquires, and it is one click. */
+  const askAgain = () => {
+    setExit(null)
+    setJoined(null)
+    setAttempt((n) => n + 1)
+  }
+
+  if (exit && exit !== 'ask-again') {
+    return <ExitScreen reason={exit} onAskAgain={askAgain} onHome={() => navigate('/')} />
+  }
 
   if (!joined) {
     return (
@@ -96,6 +120,9 @@ function PrecallThenRoom({
         title={session.title}
         suggestedName={suggestedName(user)}
         busy={joining}
+        /* Only ever set by a re-knock, so a student sent back here knows why
+           they are looking at a device picker again instead of a classroom. */
+        notice={attempt > 0 ? 'You can ask to join again when you are ready.' : undefined}
         onJoin={async (details) => {
           setJoining(true)
           /* Re-mint before mounting the provider. Ten minutes can pass while
@@ -106,6 +133,7 @@ function PrecallThenRoom({
             /* Keep the token we already hold; if it has expired the join will
                fail loudly, which beats blocking on a transient network hiccup. */
           }
+          setJoining(false)
           setJoined(details)
         }}
       />
@@ -114,6 +142,7 @@ function PrecallThenRoom({
 
   return (
     <RoomProvider
+      key={attempt}
       meetingId={fresh.meetingId}
       token={fresh.token}
       name={joined.name}
@@ -124,7 +153,87 @@ function PrecallThenRoom({
       customCameraVideoTrack={joined.tracks.camera}
       customMicrophoneAudioTrack={joined.tracks.microphone}
     >
-      <LiveClassroom mode={fresh.mode} title={fresh.title} />
+      <RoomGate
+        mode={fresh.mode}
+        title={fresh.title}
+        name={joined.name}
+        participantId={fresh.participantId}
+        isTeacher={fresh.role === 'teacher'}
+        onExit={(reason) => {
+          if (reason === 'ask-again') askAgain()
+          else setExit(reason)
+        }}
+      />
     </RoomProvider>
+  )
+}
+
+/* Every way out of a class, said plainly.
+
+   These render with the provider UNMOUNTED, which is the point: a student who
+   was declined is looking at a page with no meeting behind it, so "declined"
+   can never be confused with "still connecting". */
+const EXIT_COPY: Record<
+  Exclude<ExitReason, 'ask-again'>,
+  { tone: 'info' | 'danger'; title: string; body: string; canAskAgain: boolean }
+> = {
+  declined: {
+    tone: 'info',
+    title: 'The teacher did not let you in',
+    body: 'They may be mid-class, or expecting you at a different time. You can ask again.',
+    canAskAgain: true,
+  },
+  left: {
+    tone: 'info',
+    title: 'You left the waiting room',
+    body: 'Nobody was told. You can ask to join again whenever you like.',
+    canAskAgain: true,
+  },
+  ended: {
+    tone: 'info',
+    title: 'This class has ended',
+    body: 'The teacher closed it. Ask for a new link if it runs again.',
+    canAskAgain: false,
+  },
+  /* The second-tab collision. participantId is the Supabase user id, so one
+     account is one seat and the newer tab evicts the older - by design, and
+     worth a sentence rather than a bare disconnect nobody can explain. */
+  evicted: {
+    tone: 'danger',
+    title: 'This class is open in another tab',
+    body: 'One account can hold one seat, and the newest tab keeps it. Close the others and rejoin here.',
+    canAskAgain: true,
+  },
+}
+
+function ExitScreen({
+  reason,
+  onAskAgain,
+  onHome,
+}: {
+  reason: Exclude<ExitReason, 'ask-again'>
+  onAskAgain: () => void
+  onHome: () => void
+}) {
+  const copy = EXIT_COPY[reason]
+
+  return (
+    <div className="flex h-full items-center justify-center bg-canvas p-6">
+      <div className="flex w-full max-w-[420px] flex-col gap-4">
+        <Alert tone={copy.tone} title={copy.title}>
+          {copy.body}
+        </Alert>
+        <div className="flex gap-2">
+          {copy.canAskAgain && (
+            <Button size="lg" onClick={onAskAgain}>
+              Ask again
+            </Button>
+          )}
+          <Button size="lg" variant="secondary" onClick={onHome}>
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

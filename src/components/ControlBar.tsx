@@ -34,6 +34,9 @@ export interface ControlBarProps {
   panel: PanelKind
   onSetPanel: (next: PanelKind) => void
   participantCount: number
+  /** Students knocking. Teacher-only in practice - a student's queue is
+      always empty, because only allow_mod receives the event. */
+  waitingCount: number
 
   moreOpen: boolean
   onSetMoreOpen: (next: boolean) => void
@@ -61,6 +64,7 @@ export function ControlBar({
   panel,
   onSetPanel,
   participantCount,
+  waitingCount,
   moreOpen,
   onSetMoreOpen,
   onLeave,
@@ -134,17 +138,24 @@ export function ControlBar({
 
       <div className="relative">
         <CtrlBtn
-          label="Participants"
+          label={waitingCount > 0 ? `${waitingCount} waiting to join` : 'Participants'}
           active={panel === 'people'}
           onClick={() => onSetPanel(panel === 'people' ? null : 'people')}
         >
           <RoomIcon name="users" size={18} />
         </CtrlBtn>
+        {/* The count turns into the waiting count and takes the accent when
+            somebody is knocking. A teacher with the panel closed and the
+            board full-screen needs the control itself to carry the news. */}
         <span
           className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-pill px-1 text-xs font-semibold"
-          style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)' }}
+          style={
+            waitingCount > 0
+              ? { background: 'var(--primary-500)', color: 'var(--primary-on)' }
+              : { background: 'var(--surface-raised)', color: 'var(--text-secondary)' }
+          }
         >
-          {participantCount}
+          {waitingCount > 0 ? waitingCount : participantCount}
         </span>
       </div>
       <CtrlBtn

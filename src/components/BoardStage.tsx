@@ -1,10 +1,9 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import {
   BOARD_BG,
   BOARD_HARD_FLOOR_WIDTH,
   BOARD_KEEPOUT,
   COLLABORATORS_HEIGHT,
-  PAGE_MENU_WIDTH,
   isBoardBelowFloor,
   useBaseRect,
 } from '../lib/boardGeometry'
@@ -34,15 +33,26 @@ export interface BoardStageProps {
       off the board's edge and into the surround. Rendered in the
       pointer-events-none layer, so an interactive leaf must opt back in. */
   overlay?: ReactNode
+  /** Whether this participant is meant to draw.
+
+      A UI convention, not a permission. useWhiteboard() exposes exactly three
+      members - startWhiteboard, stopWhiteboard, whiteboardUrl - so there is no
+      role to send, no read-only flag and no URL parameter the hosted board
+      would honour. Everything false does here happens on this side of the
+      iframe: any token holder can still start or stop the board, and a student
+      who opens devtools can delete the guard div and draw. It is the same
+      class of guarantee ControlBar.tsx already writes down, where only muting
+      is enforced server-side. Required rather than defaulted, because a
+      forgotten prop must not silently hand a student the pen. */
+  canDraw: boolean
   /** Dev-only. Paints the regions tldraw's own furniture occupies, so app
       chrome can be checked against them rather than placed by eye. */
   showKeepout?: boolean
 }
 
-export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProps) {
+export function BoardStage({ url, overlay, canDraw, showKeepout = false }: BoardStageProps) {
   const boardOn = url !== null
   const { ref, rect } = useBaseRect()
-  const [hintDismissed, setHintDismissed] = useState(false)
   const squeezed = isBoardBelowFloor(rect)
 
   return (
@@ -79,9 +89,36 @@ export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProp
                 The board is not open yet
               </span>
               <span className="text-base" style={{ color: '#71717a' }}>
-                Your teacher starts it for the class.
+                {canDraw ? 'Opening it for the class.' : 'Your teacher starts it for the class.'}
               </span>
             </div>
+          )}
+
+          {/* The read-only guard, and the one place in this file where the
+              iframe's worst property is the point rather than the hazard.
+
+              The pill's comment below records it as a trap: an iframe
+              swallows nothing and blocks everything, so a transparent layer
+              that accepts pointer events makes the board undrawable. That is
+              exactly the effect wanted here, so this layer opts into pointer
+              events on purpose and every stroke dies on it.
+
+              Invisible on purpose. It paints nothing over the board and dims
+              none of the board's own controls: a student watching a lesson
+              should see the board the teacher sees, and a scrim over the tool
+              rail reads as a rendering fault rather than as a rule. The tools
+              are simply inert, which is what "watch this" looks like.
+
+              It sits after the iframe but BEFORE the pointer-events-none
+              overlay layer, so teacher chrome still paints and still clicks
+              through to its own leaves. Flip the two and the guard would
+              cover the chrome as well. */}
+          {boardOn && !canDraw && (
+            <div
+              className="absolute inset-0"
+              style={{ pointerEvents: 'auto', cursor: 'default' }}
+              aria-hidden="true"
+            />
           )}
 
           {/* Overlay chrome. Positions are fractions of the base rect rather
@@ -98,47 +135,6 @@ export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProp
               full-bleed layer that accepts pointer events would eat every
               stroke before it reached the canvas. */}
           <div className="pointer-events-none absolute inset-0">
-          {boardOn && !hintDismissed && (
-            /* Centred in what is LEFT of the board, not in the board.
-               tldraw's page menu is a fixed 346px while the board is not, so
-               a pill centred on the board reaches back into the menu as soon
-               as the window gets small - and it does it by overlapping a
-               control, which reads as a broken embed rather than as a layout
-               bug. */
-            <div
-              className="absolute flex justify-center"
-              style={{ left: PAGE_MENU_WIDTH + 12, right: 12, top: 0.022 * rect.height }}
-            >
-            <div
-              /* pointer-events-auto on the pill itself, because the layer it
-                 sits in is pointer-events-none. An iframe swallows nothing and
-                 blocks everything: any transparent overlay above it that still
-                 accepts pointer events makes the board undrawable, and that
-                 reads as "the embed broke" rather than as a CSS mistake. The
-                 rule is enforced by the wrapper below, not by remembering. */
-              className="pointer-events-auto flex items-center gap-2 rounded-pill py-1.5 pl-3 pr-1.5"
-              style={{ background: 'rgba(9,9,11,.86)', backdropFilter: 'blur(4px)' }}
-            >
-              {/* The failure here runs opposite to the documented one. The
-                  risk is not that a student draws when they should not - it
-                  is that nobody draws at all, because a board reads as
-                  something to watch rather than something to touch. So it is
-                  said on the surface, not only in the docs. */}
-              <span className="text-base text-white">Everyone can draw on this board</span>
-              <button
-                type="button"
-                onClick={() => setHintDismissed(true)}
-                aria-label="Dismiss"
-                className="flex size-6 cursor-pointer items-center justify-center rounded-pill border-0 bg-transparent text-white/60 hover:text-white"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            </div>
-          )}
-
           {/* Top-right, below the collaborator row. The style panel is on the
               right edge but low down, at y = H-344, so the top of that edge is
               clear of it - what is NOT clear is tldraw's avatar chips, which

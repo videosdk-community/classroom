@@ -2,7 +2,7 @@ import { ChatPanel } from './ChatPanel'
 import { LectureStage } from './LectureStage'
 import { PeoplePanel } from './PeoplePanel'
 import { RoomIcon } from './icons'
-import { cn } from '../design/ui'
+import { IconButton, cn } from '../design/ui'
 import type { PanelKind } from './ControlBar'
 import type { ChatMessage, ClassMode, Person } from '../domain/classroom'
 import type { EntryRequest } from '../sdk'
@@ -99,13 +99,15 @@ export function SidePanel({
           <span className="text-base font-semibold text-ink">
             {panel === 'chat' ? 'Messages' : `People (${people.length})`}
           </span>
-          <button
-            type="button"
+          <IconButton
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            aria-label="Hide panel"
             onClick={onHide}
-            className="ml-auto cursor-pointer border-0 bg-transparent p-0 text-sm text-ink-tertiary hover:text-ink"
           >
-            Hide
-          </button>
+            <RoomIcon name="close" size={16} />
+          </IconButton>
         </div>
       )}
 

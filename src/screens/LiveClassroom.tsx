@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BoardStage } from '../components/BoardStage'
 import { HandsChip } from '../components/HandsChip'
 import { KnockCard } from '../components/KnockCard'
@@ -9,7 +9,9 @@ import { TopBar } from '../components/TopBar'
 import { VideoRail } from '../components/VideoRail'
 import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
+import { useElapsedSeconds } from '../lib/useElapsedSeconds'
 import { useMediaQuery } from '../lib/useMediaQuery'
+import { useToast } from '../design/ui'
 import {
   CHAT_TOPIC,
   CLASS_CONTROLS_TOPIC,
@@ -43,6 +45,18 @@ import {
 /* A stable empty array, so a student's SidePanel does not get a new [] every
    render and re-render the roster for nothing. */
 const EMPTY_QUEUE: readonly EntryRequest[] = []
+
+/* m:ss under an hour, h:mm:ss over it. Seconds are padded and minutes are not,
+   so a class that has been running four minutes reads "4:12" rather than
+   "04:12" - the leading zero buys nothing and makes a short number look like a
+   timestamp. */
+function formatClock(total: number) {
+  const s = total % 60
+  const m = Math.floor(total / 60) % 60
+  const h = Math.floor(total / 3600)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
 
 function toPerson(p: ParticipantView, raised: ReadonlySet<string>, onstage: boolean): Person {
   return {
@@ -82,7 +96,10 @@ export function LiveClassroom({
   const actions = useRoomActions()
   const messages = useTopic(CHAT_TOPIC)
 
-  const [panel, setPanel] = useState<PanelKind>('chat')
+  /* The room opens on the board, not on the chat. The board is the product
+     and the first thing a class should see; the panel is one click away and
+     the control bar carries the toggle. */
+  const [panel, setPanel] = useState<PanelKind>(null)
   const [moreOpen, setMoreOpen] = useState(false)
 
   /* Class state is not local state. Both toggles used to be useState here,
@@ -115,6 +132,67 @@ export function LiveClassroom({
 
   const self = useParticipantView(localId ?? '')
 
+  const toast = useToast()
+
+  /* Counts from when this participant mounted, not from when the class
+     started. The SDK exposes no session start time, and a per-viewer clock
+     that is honest beats a shared one that is invented. */
+  const elapsed = formatClock(useElapsedSeconds())
+
+  /* Whether the board has ever been open for this participant. Tracked in a
+     ref rather than derived, because "the teacher stopped the board" and "the
+     board has not started yet" look identical from a null url, and only the
+     history tells them apart. */
+  const boardOpenedOnce = useRef(false)
+  useEffect(() => {
+    if (whiteboard.url) boardOpenedOnce.current = true
+  }, [whiteboard.url])
+
+  /* The teacher's board opens itself.
+
+     A class that opens on an empty board region reads as a product that has
+     not loaded, and the board is the whole point of this one.
+
+     It retries, and the retry is the entire reason this is not a single call.
+     A startWhiteboard issued in the same beat as onMeetingJoined is accepted
+     and then silently dropped - no throw, no onError, no 4056, just a board
+     that never opens. Driven in the browser rather than reasoned about: the
+     one-shot version left the teacher looking at "The board is not open yet"
+     while the same call from the control bar a second later worked every time.
+
+     Each attempt awaits the last, so the in-flight flag is never contended and
+     the server never sees the double-start that 4056 exists to reject.
+
+     It stops the moment the board opens, and it never fires again afterwards -
+     a teacher who deliberately stops the board must not have it reopened
+     underneath them, which would read as a broken control rather than as a
+     default. */
+  useEffect(() => {
+    if (!isTeacher || boardOpenedOnce.current || whiteboard.url) return
+    let cancelled = false
+    void (async () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        if (cancelled || boardOpenedOnce.current) return
+        await actions.startWhiteboard()
+        if (cancelled || boardOpenedOnce.current) return
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isTeacher, whiteboard.url, actions])
+
+  /* Announced on the transition rather than on the click, so the teacher is
+     told what the SDK actually did and every other participant's badge and
+     this message agree. */
+  const wasRecording = useRef(recording)
+  useEffect(() => {
+    if (wasRecording.current === recording) return
+    wasRecording.current = recording
+    toast(recording ? 'Recording started' : 'Recording stopped', recording ? 'danger' : 'neutral')
+  }, [recording, toast])
+
 
   /* The knock queue. Only a token holding allow_mod ever receives these, so a
      student's queue is permanently empty and the surfaces below simply never
@@ -127,7 +205,7 @@ export function LiveClassroom({
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">
-      <TopBar title={title} mode={mode} recording={recording} elapsed="live" />
+      <TopBar title={title} mode={mode} recording={recording} elapsed={elapsed} />
 
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
@@ -143,6 +221,7 @@ export function LiveClassroom({
           <div className="min-h-0 flex-1 p-6">
             <BoardStage
               url={whiteboard.url}
+              canDraw={isTeacher}
               overlay={
                 isTeacher ? (
                   /* One stack, top-right. Knocks first: somebody waiting to
@@ -187,7 +266,20 @@ export function LiveClassroom({
               if (whiteboard.url) void actions.stopWhiteboard()
               else void actions.startWhiteboard()
             }}
-            onMuteAll={actions.muteEveryoneElse}
+            isRecording={recording}
+            onToggleRecording={() => {
+              if (recording) actions.stopRecording()
+              else actions.startRecording()
+            }}
+            onMuteAll={() => {
+              /* The action used to return void and say nothing, so a teacher
+                 who muted a room of forty had no way to tell it from a dead
+                 button. The count comes back from the loop that did the work,
+                 not from the roster, so it cannot claim more than it muted. */
+              const muted = actions.muteEveryoneElse()
+              if (muted === 0) toast('Everyone is already muted')
+              else toast(`Muted ${muted} ${muted === 1 ? 'student' : 'students'}`, 'success')
+            }}
             chatEnabled={controls.chatEnabled}
             onToggleChatEnabled={(next) => setControls({ chatEnabled: next })}
             onToggleHandsEnabled={(next) => setControls({ handsEnabled: next })}

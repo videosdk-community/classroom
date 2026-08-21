@@ -25,6 +25,8 @@ export interface ControlBarProps {
   boardOn: boolean
   boardBusy: boolean
   onToggleBoard: () => void
+  isRecording: boolean
+  onToggleRecording: () => void
   onMuteAll: () => void
 
   chatEnabled: boolean
@@ -57,6 +59,8 @@ export function ControlBar({
   boardOn,
   boardBusy,
   onToggleBoard,
+  isRecording,
+  onToggleRecording,
   onMuteAll,
   chatEnabled,
   onToggleChatEnabled,
@@ -86,20 +90,26 @@ export function ControlBar({
       >
         <RoomIcon name={camOn ? 'cam' : 'camOff'} size={18} />
       </CtrlBtn>
-      <CtrlBtn
-        label={
-          !handsEnabled
-            ? 'Hand raising is off for this class'
-            : handRaised
-              ? 'Lower your hand'
-              : 'Raise your hand'
-        }
-        active={handRaised}
-        disabled={!handsEnabled}
-        onClick={onToggleHand}
-      >
-        <RoomIcon name="hand" size={18} />
-      </CtrlBtn>
+      {/* Students only. A teacher raising a hand has nobody to raise it to -
+          they are the person the gesture addresses. The Raise hand switch in
+          the More popover below is a different control: it governs whether
+          the class may raise hands at all. */}
+      {!isTeacher && (
+        <CtrlBtn
+          label={
+            !handsEnabled
+              ? 'Hand raising is off for this class'
+              : handRaised
+                ? 'Lower your hand'
+                : 'Raise your hand'
+          }
+          active={handRaised}
+          disabled={!handsEnabled}
+          onClick={onToggleHand}
+        >
+          <RoomIcon name="hand" size={18} />
+        </CtrlBtn>
+      )}
 
       <div className="mx-2 h-6 w-px bg-line" />
 
@@ -120,6 +130,19 @@ export function ControlBar({
             onClick={onToggleBoard}
           >
             <RoomIcon name="board" size={18} />
+          </CtrlBtn>
+          {/* Red while recording, because it matches the badge the top bar
+              shows the whole class. The state comes from the SDK's own
+              recording event rather than from a local flag, so the control is
+              already lit during RECORDING_STARTING and cannot be double-fired
+              through the transition. */}
+          <CtrlBtn
+            label={isRecording ? 'Stop recording' : 'Start recording'}
+            text={isRecording ? 'Stop' : 'Record'}
+            danger={isRecording}
+            onClick={onToggleRecording}
+          >
+            <RoomIcon name="record" size={18} />
           </CtrlBtn>
           <CtrlBtn label="Mute everyone" text="Mute all" onClick={onMuteAll}>
             <RoomIcon name="muteAll" size={18} />
@@ -193,7 +216,8 @@ export function ControlBar({
           {/* Said plainly, here and in DECISIONS.md, because it is true and
               because a later reviewer should not have to rediscover it. */}
           <div className="border-t border-line px-3 py-2 text-xs leading-[15px] text-ink-tertiary">
-            Broadcast state each client honors. Only muting is enforced server-side.
+            Chat, hands and the board are broadcast state each client honors.
+            Only muting is enforced server-side.
           </div>
         </div>
       )}

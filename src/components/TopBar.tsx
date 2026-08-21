@@ -34,8 +34,16 @@ export function TopBar({ title, mode, recording, elapsed }: TopBarProps) {
         </span>
       )}
 
+      {/* The clock counts from the moment this participant mounted, not from
+          when the class actually started, because the SDK gives us no session
+          start time to anchor on. A per-viewer clock that is honest about what
+          it measures beats a shared one we would have to invent. */}
       <span className="ml-auto flex items-center gap-2 text-sm text-ink-tertiary">
-        <RoomIcon name="signal" size={15} />
+        <span
+          className="h-1.5 w-1.5 rounded-pill"
+          style={{ background: 'var(--red-600)' }}
+        />
+        <span className="font-medium text-ink-secondary">Live</span>
         {elapsed}
       </span>
     </header>

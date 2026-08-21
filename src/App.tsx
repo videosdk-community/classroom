@@ -3,6 +3,8 @@ import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import { Classroom } from './screens/Classroom'
 import { LiveClassroom } from './screens/LiveClassroom'
 import { Precall } from './screens/Precall'
+import { SignIn } from './screens/SignIn'
+import { AuthCallback } from './screens/AuthCallback'
 import { RoomProvider, devSession, type PrecallTracks } from './sdk'
 import type { ClassMode } from './domain/classroom'
 
@@ -99,6 +101,8 @@ function PrecallThenRoom({
 export default function App() {
   return (
     <Routes>
+      <Route path="/signin" element={<SignIn />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/room" element={<FixtureRoute />} />
       <Route path="/live" element={<LiveRoute />} />
       <Route path="*" element={<Navigate to="/room" replace />} />

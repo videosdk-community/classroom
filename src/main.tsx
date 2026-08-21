@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
+import { AuthProvider } from './auth/AuthProvider'
 
 /* No <StrictMode> here, and this is deliberate rather than an oversight.
 
@@ -20,6 +21,8 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </BrowserRouter>,
 )

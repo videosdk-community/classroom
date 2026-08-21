@@ -12,6 +12,7 @@ import {
   CHAT_TOPIC,
   useIsRecording,
   useLocalId,
+  useTeacherId,
   useParticipantIds,
   useParticipantView,
   useParticipantViews,
@@ -62,6 +63,10 @@ export function LiveClassroom({
   const ids = useParticipantIds()
   const views = useParticipantViews()
   const localId = useLocalId()
+  /* Server-derived, straight off the session response. Read here rather than
+     found in the roster, so it is right before the teacher's own participant
+     event has landed. */
+  const teacherId = useTeacherId()
   const recording = useIsRecording()
   const whiteboard = useWhiteboard()
   const actions = useRoomActions()
@@ -81,10 +86,6 @@ export function LiveClassroom({
 
   const self = useParticipantView(localId ?? '')
 
-  /* Server-derived, so this finds the real teacher rather than whoever
-     claimed to be one. Null until their row arrives - a class can be opened
-     before the teacher's own participant event has landed. */
-  const teacherId = views.find((p) => p.isTeacher)?.id ?? null
 
   /* The knock queue. Only a token holding allow_mod ever receives these, so a
      student's queue is permanently empty and the surfaces below simply never

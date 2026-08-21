@@ -14,6 +14,7 @@ export type { RoomProviderProps } from './RoomProvider'
 export {
   useRoomStatus,
   useLocalId,
+  useTeacherId,
   useParticipantIds,
   useParticipantView,
   useParticipantViews,

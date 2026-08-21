@@ -57,6 +57,7 @@ const EMPTY: readonly RoomMessage[] = []
 // Module-level selectors, so nothing captures a fresh closure per render.
 const selStatus = (s: RoomSnapshot) => s.status
 const selLocalId = (s: RoomSnapshot) => s.localId
+const selTeacherId = (s: RoomSnapshot) => s.teacherId
 const selIds = (s: RoomSnapshot) => s.participantIds
 const selRecording = (s: RoomSnapshot) => s.isRecording
 const selWhiteboard = (s: RoomSnapshot) => s.whiteboard
@@ -67,6 +68,9 @@ const selLeaveReason = (s: RoomSnapshot) => s.leaveReason
 
 export const useRoomStatus = () => useSelector(selStatus)
 export const useLocalId = () => useSelector(selLocalId)
+/** The teacher's participantId, as the server derived it. Null in a store
+    built without one, which no real room does. */
+export const useTeacherId = () => useSelector(selTeacherId)
 export const useParticipantIds = () => useSelector(selIds, arrayEqual)
 export const useIsRecording = () => useSelector(selRecording)
 export const useWhiteboard = () => useSelector(selWhiteboard)

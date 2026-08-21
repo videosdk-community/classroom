@@ -24,6 +24,7 @@ const INITIAL: RoomSnapshot = {
   status: 'idle',
   meetingId: null,
   localId: null,
+  teacherId: null,
   participantIds: [],
   participants: {},
   activeSpeakerId: null,
@@ -75,7 +76,7 @@ export interface RoomFacade extends RoomActions {
    participant row can exist, and a row can never be built with the wrong role
    and corrected a frame later. */
 export function createRoomStore(teacherId: string | null = null) {
-  let snapshot: RoomSnapshot = INITIAL
+  let snapshot: RoomSnapshot = { ...INITIAL, teacherId }
   let version = 0
   const listeners = new Set<() => void>()
 
@@ -291,7 +292,7 @@ export function createRoomStore(teacherId: string | null = null) {
     getActionFacade: () => facade,
 
     reset() {
-      snapshot = INITIAL
+      snapshot = { ...INITIAL, teacherId }
       entryClosures.clear()
       tracks.clear()
       emit()

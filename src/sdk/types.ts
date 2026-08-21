@@ -91,6 +91,10 @@ export interface RoomSnapshot {
   status: RoomStatus
   meetingId: string | null
   localId: string | null
+  /** The teacher's participantId, server-derived from room ownership. Fixed
+      for the life of the store. Every row's role is decided against it, and
+      it is what makes a class-control message believable. */
+  teacherId: string | null
   participantIds: readonly string[]
   participants: Readonly<Record<string, ParticipantView>>
   activeSpeakerId: string | null

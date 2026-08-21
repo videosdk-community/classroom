@@ -282,6 +282,15 @@ why the full-stack script is `dev:api` and not `dev`.
 `vercel.json`'s SPA rewrite excludes the API with a negative lookahead. Without
 it every function call returns `index.html` with a 200.
 
+It excludes **`@`, `src/` and `node_modules/` as well**, and that is not
+cosmetic. In production those paths do not exist - Vite emits hashed files
+under `assets/` - but in development they are Vite's own module namespace, and
+`vercel dev` applies the production rewrite to them. Every one of
+`/@vite/client`, `/@react-refresh` and `/src/main.tsx` was answered with
+`index.html`, which Vite then tried to parse as JavaScript, so the page loaded a
+blank body and three 500s that blamed `index.html:16` - a line that is fine.
+The app never booted at all under `vercel dev` until this was narrowed.
+
 ## Signing in during development, without the email
 
 Supabase's built-in sender is testing-only and rate-limited to a handful of messages an hour for

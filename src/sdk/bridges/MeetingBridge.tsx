@@ -171,7 +171,6 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
           store.setError({ code: 0, message: 'That decision did not go through. Try again.' })
         }
       },
-      publish: async () => {},
     })
   }, [store])
 

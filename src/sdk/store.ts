@@ -55,7 +55,18 @@ export interface RoomActions {
   startWhiteboard: () => Promise<void>
   stopWhiteboard: () => Promise<void>
   respondEntry: (id: string, allow: boolean) => Promise<void>
-  publish: (topic: string, text: string, persist: boolean) => Promise<void>
+}
+
+/* One topic's publisher, registered by the PubSubBridge that owns the topic.
+
+   `persist` is a property of the topic, not of the call, so it lives with the
+   bridge and callers never pass it. Getting that wrong once - one publish with
+   persist false on CLASS_CONTROLS - silently breaks late joiners only. */
+export type PublishFn = (text: string, payload?: Record<string, unknown>) => Promise<void>
+
+/** What feature code holds: the actions, plus publish routed by topic. */
+export interface RoomFacade extends RoomActions {
+  publish: (topic: string, text: string, payload?: Record<string, unknown>) => Promise<void>
 }
 
 /* teacherId comes from api/session.ts, which derives it from room ownership.
@@ -84,6 +95,14 @@ export function createRoomStore(teacherId: string | null = null) {
 
   let actions: RoomActions | null = null
 
+  /* Outside the snapshot, and deliberately a registry rather than a field on
+     RoomActions. Every bridge used to register publish by spreading over
+     whatever the previous one had left, guarded by `if (topic !== mine)
+     return` - so the last bridge to mount won and every other topic published
+     into nothing. Routing by topic here removes the mount-order dependency
+     entirely. */
+  const publishers = new Map<string, PublishFn>()
+
   /* A stable facade, built once and handed to every consumer.
 
      The bridges register their real implementations in effects, and React
@@ -99,7 +118,7 @@ export function createRoomStore(teacherId: string | null = null) {
     warn(`room action "${name}" called before the bridges registered; ignoring`)
   }
 
-  const facade: RoomActions = {
+  const facade: RoomFacade = {
     join: () => (actions ? actions.join() : notReady('join')()),
     leave: () => (actions ? actions.leave() : notReady('leave')()),
     end: () => (actions ? actions.end() : notReady('end')()),
@@ -120,9 +139,13 @@ export function createRoomStore(teacherId: string | null = null) {
       if (actions) await actions.respondEntry(id, allow)
       else notReady('respondEntry')()
     },
-    publish: async (topic, text, persist) => {
-      if (actions) await actions.publish(topic, text, persist)
-      else notReady('publish')()
+    publish: async (topic, text, payload) => {
+      const publisher = publishers.get(topic)
+      if (!publisher) {
+        warn(`no publisher registered for topic "${topic}"; message dropped`)
+        return
+      }
+      await publisher(text, payload)
     },
   }
 
@@ -251,6 +274,14 @@ export function createRoomStore(teacherId: string | null = null) {
     subscribeTracks(listener: (id: string) => void) {
       trackListeners.add(listener)
       return () => trackListeners.delete(listener)
+    },
+
+    /** Called by the PubSubBridge for its own topic; returns the unregister. */
+    registerPublisher(topic: string, fn: PublishFn) {
+      publishers.set(topic, fn)
+      return () => {
+        if (publishers.get(topic) === fn) publishers.delete(topic)
+      }
     },
 
     setActions: (next: RoomActions) => { actions = next },

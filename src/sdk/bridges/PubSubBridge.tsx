@@ -35,20 +35,17 @@ export function PubSubBridge({
     publishRef.current = publish
   })
 
-  useEffect(() => {
-    const existing = store.getActions()
-    if (!existing) return
-    store.setActions({
-      ...existing,
-      publish: async (t, text, shouldPersist) => {
-        if (t !== topic) return
+  useEffect(
+    () =>
+      store.registerPublisher(topic, async (text, payload) => {
         /* The options object is declared as a REQUIRED positional parameter,
            so `publish(text)` fails tsc even though the runtime allows it.
-           Always passed explicitly. */
-        await publishRef.current(text, { persist: shouldPersist })
-      },
-    })
-  }, [store, topic, persist])
+           Always passed explicitly. `payload` is the third argument and is
+           only sent when there is one. */
+        await publishRef.current(text, { persist }, payload)
+      }),
+    [store, topic, persist],
+  )
 
   return null
 }

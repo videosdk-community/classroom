@@ -7,7 +7,10 @@ import { SignIn } from './screens/SignIn'
 import { AuthCallback } from './screens/AuthCallback'
 import { Home } from './screens/Home'
 import { RequireAuth } from './auth/RequireAuth'
-import { RoomProvider, devSession, type PrecallTracks } from './sdk'
+import { RoomProvider, devSession } from './sdk'
+import type { JoinDetails } from './screens/Precall'
+import { suggestedName } from './auth/context'
+import { useAuth } from './auth/context'
 import type { ClassMode } from './domain/classroom'
 
 /* Routes.
@@ -53,11 +56,7 @@ function LiveRoute() {
   return <PrecallThenRoom mode={mode} meetingId={dev.meetingId} token={dev.token} />
 }
 
-interface Joined {
-  tracks: PrecallTracks
-  micOn: boolean
-  camOn: boolean
-}
+type Joined = JoinDetails
 
 /* Precall and the room are SIBLINGS, never nested.
 
@@ -76,12 +75,12 @@ function PrecallThenRoom({
   token: string
 }) {
   const [joined, setJoined] = useState<Joined | null>(null)
+  const { user } = useAuth()
+  const suggested = suggestedName(user)
 
   if (!joined) {
     return (
-      <Precall
-        onJoin={(tracks, micOn, camOn) => setJoined({ tracks, micOn, camOn })}
-      />
+      <Precall suggestedName={suggested} onJoin={setJoined} />
     )
   }
 
@@ -89,7 +88,7 @@ function PrecallThenRoom({
     <RoomProvider
       meetingId={meetingId}
       token={token}
-      name="Teacher"
+      name={joined.name}
       micEnabled={joined.micOn}
       camEnabled={joined.camOn}
       customCameraVideoTrack={joined.tracks.camera}

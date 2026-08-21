@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MicMeter } from '../components/MicMeter'
 import { PermissionHelp } from '../components/PermissionHelp'
 import { RoomIcon } from '../components/icons'
-import { Button, Select, Spinner } from '../design/ui'
+import { Button, Input, Select, Spinner } from '../design/ui'
 import { usePrecall, type PrecallTracks } from '../sdk'
 
 /* Precall: check the devices before the class sees you.
@@ -12,9 +12,26 @@ import { usePrecall, type PrecallTracks } from '../sdk'
    custom tracks are read on its first mount and ignored afterwards - the
    handoff only works if the tracks exist before the provider exists. */
 
-export function Precall({ onJoin }: { onJoin: (tracks: PrecallTracks, micOn: boolean, camOn: boolean) => void }) {
+export interface JoinDetails {
+  tracks: PrecallTracks
+  micOn: boolean
+  camOn: boolean
+  name: string
+}
+
+export interface PrecallProps {
+  onJoin: (details: JoinDetails) => void
+  /** The class being joined, so nobody wonders which link they clicked. */
+  title?: string
+  /** Prefilled name, usually the local part of the signed-in email. */
+  suggestedName?: string
+  busy?: boolean
+}
+
+export function Precall({ onJoin, title, suggestedName = '', busy = false }: PrecallProps) {
   const p = usePrecall()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [name, setName] = useState(suggestedName)
 
   useEffect(() => {
     const el = videoRef.current
@@ -41,19 +58,50 @@ export function Precall({ onJoin }: { onJoin: (tracks: PrecallTracks, micOn: boo
     }
   }, [discard])
 
+  const trimmedName = name.trim()
+  const canJoin = trimmedName.length > 0 && !busy
+
   const join = () => {
+    if (!canJoin) return
     joined.current = true
-    onJoin(p.handOff(), p.micOn, p.camOn)
+    onJoin({ tracks: p.handOff(), micOn: p.micOn, camOn: p.camOn, name: trimmedName })
+  }
+
+  /* The bail-out paths below skip the `granted` block entirely, so they carry
+     the name too - otherwise someone whose camera is blocked joins nameless. */
+  const joinWithout = () => {
+    joined.current = true
+    onJoin({ tracks: {}, micOn: false, camOn: false, name: trimmedName || 'Guest' })
   }
 
   return (
     <div className="flex h-full items-center justify-center bg-canvas p-6">
       <div className="flex w-full max-w-[880px] flex-col items-center gap-6">
-        <h1 className="text-2xl font-semibold text-ink">Ready to join?</h1>
+        <div className="flex flex-col items-center gap-1">
+          <h1 className="text-2xl font-semibold text-ink">Ready to join?</h1>
+          {title && <span className="text-base text-ink-secondary">{title}</span>}
+        </div>
+
+        {/* Outside every per-state block on purpose. The blocked and
+            unavailable paths never render the `granted` block, and a name
+            asked for only in there would be skipped by exactly the people who
+            most need to be identifiable in the room. */}
+        <label className="flex w-full max-w-[420px] flex-col gap-1.5">
+          <span className="text-sm text-ink-tertiary">Your name</span>
+          <Input
+            size="lg"
+            required
+            maxLength={60}
+            placeholder="How the class should see you"
+            value={name}
+            error={name.trim() === ''}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
 
         {p.state === 'checking' && <Spinner />}
 
-        {p.state === 'blocked' && <PermissionHelp onContinue={() => onJoin({}, false, false)} />}
+        {p.state === 'blocked' && <PermissionHelp onContinue={joinWithout} />}
 
         {p.state === 'unavailable' && (
           <div className="flex max-w-[520px] flex-col items-center gap-4 text-center">
@@ -61,7 +109,7 @@ export function Precall({ onJoin }: { onJoin: (tracks: PrecallTracks, micOn: boo
               No camera or microphone is available. Another application may be using it, or none is
               attached. You can still join and listen.
             </p>
-            <Button onClick={() => onJoin({}, false, false)}>Join to listen</Button>
+            <Button onClick={joinWithout}>Join to listen</Button>
           </div>
         )}
 
@@ -158,8 +206,8 @@ export function Precall({ onJoin }: { onJoin: (tracks: PrecallTracks, micOn: boo
                 </span>
               </label>
 
-              <Button size="lg" onClick={join}>
-                Join the class
+              <Button size="lg" onClick={join} disabled={!canJoin}>
+                {busy ? 'Joining' : 'Join the class'}
               </Button>
             </div>
           </div>

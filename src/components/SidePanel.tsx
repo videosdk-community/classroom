@@ -38,6 +38,9 @@ export interface SidePanelProps {
   onMute: (id: string) => void
   onAskToUnmute: (id: string) => void
   onLowerHand: (id: string) => void
+  promoted: readonly string[]
+  onPromote: (id: string) => void
+  onDemote: (id: string) => void
   chatEnabled: boolean
   onSend: (text: string) => Promise<void>
   /** Once the window is too narrow for both, the panel floats over the stage
@@ -60,6 +63,9 @@ export function SidePanel({
   onMute,
   onAskToUnmute,
   onLowerHand,
+  promoted,
+  onPromote,
+  onDemote,
   chatEnabled,
   onSend,
   overlay,
@@ -79,7 +85,12 @@ export function SidePanel({
       }}
     >
       {mode === 'lecture' && (
-        <LectureStage teacherId={teacherId} selfId={self.id} isTeacher={self.role === 'teacher'} />
+        <LectureStage
+          teacherId={teacherId}
+          selfId={self.id}
+          promoted={promoted}
+          isTeacher={self.role === 'teacher'}
+        />
       )}
 
       {panel && (
@@ -109,6 +120,9 @@ export function SidePanel({
           onMute={onMute}
           onAskToUnmute={onAskToUnmute}
           onLowerHand={onLowerHand}
+          canPromote={mode === 'lecture' && self.role === 'teacher'}
+          onPromote={onPromote}
+          onDemote={onDemote}
           waiting={waiting}
           onRespond={onRespond}
         />

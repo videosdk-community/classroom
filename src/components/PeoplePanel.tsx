@@ -18,6 +18,11 @@ export interface PeoplePanelProps {
   onMute: (id: string) => void
   onAskToUnmute: (id: string) => void
   onLowerHand: (id: string) => void
+  /** Lecture only. In Class everyone is onstage already, so there is nothing
+      to promote anyone to. */
+  canPromote: boolean
+  onPromote: (id: string) => void
+  onDemote: (id: string) => void
   /** Knocking, not yet in the room. Pinned above the roster because a person
       waiting for an answer outranks a list of people who already have one,
       and because this is where a queue too long for the floating card lands. */
@@ -62,6 +67,9 @@ export function PeoplePanel({
   onMute,
   onAskToUnmute,
   onLowerHand,
+  canPromote,
+  onPromote,
+  onDemote,
   waiting,
   onRespond,
 }: PeoplePanelProps) {
@@ -107,6 +115,20 @@ export function PeoplePanel({
                   consent; enableMic only asks and fires onMicRequested on the
                   target, who decides. There is no force-unmute in the SDK and
                   this app does not pretend there is. */}
+              {canPromote && p.role !== 'teacher' && (
+                /* Both directions are layout. Promote also asks the student
+                   to unmute; demote takes the tile back and cannot take the
+                   microphone with it. */
+                p.onstage ? (
+                  <RowAction label={`Take ${p.name} off the stage`} onClick={() => onDemote(p.id)}>
+                    Off stage
+                  </RowAction>
+                ) : (
+                  <RowAction label={`Put ${p.name} on the stage`} onClick={() => onPromote(p.id)}>
+                    Onstage
+                  </RowAction>
+                )
+              )}
               {p.micOn ? (
                 <RowAction label={`Mute ${p.name}`} onClick={() => onMute(p.id)}>
                   Mute

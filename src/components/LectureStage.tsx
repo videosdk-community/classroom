@@ -11,6 +11,10 @@ import { LiveTile } from './LiveTile'
    Who the teacher is comes from the session, derived server-side from room
    ownership. Nothing here trusts a client's claim about its own role.
 
+   Promoted students join the teacher here. Promote is layout plus a request:
+   it puts a student's tile onstage and asks them to unmute. It cannot turn
+   their microphone on, because nothing in the SDK can.
+
    The self tile underneath is deliberate and not decoration. In Class a
    student finds their own face in the rail; in Lecture there is no rail, and
    a student who cannot see themselves cannot answer "am I muted", which is
@@ -19,12 +23,17 @@ import { LiveTile } from './LiveTile'
 export interface LectureStageProps {
   teacherId: string | null
   selfId: string | null
+  /** Students the teacher has put onstage, from the class-control topic. */
+  promoted: readonly string[]
   /** Whether the local participant is the teacher. When they are, the stage
       tile is already them and a second copy of the same face is noise. */
   isTeacher: boolean
 }
 
-export function LectureStage({ teacherId, selfId, isTeacher }: LectureStageProps) {
+export function LectureStage({ teacherId, selfId, promoted, isTeacher }: LectureStageProps) {
+  const onstage = promoted.filter((id) => id !== teacherId)
+  const selfOnstage = selfId !== null && onstage.includes(selfId)
+
   return (
     <div className="shrink-0 border-b border-line p-3">
       {teacherId ? (
@@ -39,7 +48,17 @@ export function LectureStage({ teacherId, selfId, isTeacher }: LectureStageProps
         </div>
       )}
 
-      {!isTeacher && selfId && (
+      {onstage.length > 0 && (
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {onstage.map((id) => (
+            <LiveTile key={id} id={id} selfId={selfId} className="aspect-[4/3] w-full" />
+          ))}
+        </div>
+      )}
+
+      {/* Skipped when you are already onstage above, which is the one case
+          where a second copy of your own face is just noise. */}
+      {!isTeacher && selfId && !selfOnstage && (
         <LiveTile id={selfId} selfId={selfId} className="mt-2 ml-auto aspect-[4/3] w-1/2" />
       )}
 
@@ -47,7 +66,9 @@ export function LectureStage({ teacherId, selfId, isTeacher }: LectureStageProps
           convention - it makes no claim to lock the audience out of the board,
           and a student who assumes otherwise simply never draws. */}
       <p className="mt-2 text-sm text-ink-tertiary">
-        Only the teacher is onstage. Everyone can still draw on the board.
+        {onstage.length === 0
+          ? 'Only the teacher is onstage. Everyone can still draw on the board.'
+          : 'Being onstage is mic and camera. Everyone can still draw on the board.'}
       </p>
     </div>
   )

@@ -44,7 +44,7 @@ import {
    render and re-render the roster for nothing. */
 const EMPTY_QUEUE: readonly EntryRequest[] = []
 
-function toPerson(p: ParticipantView, raised: ReadonlySet<string>): Person {
+function toPerson(p: ParticipantView, raised: ReadonlySet<string>, onstage: boolean): Person {
   return {
     id: p.id,
     name: p.name,
@@ -53,7 +53,7 @@ function toPerson(p: ParticipantView, raised: ReadonlySet<string>): Person {
     camOn: p.camOn,
     handRaised: raised.has(p.id),
     speaking: p.isActiveSpeaker,
-    onstage: true,
+    onstage,
   }
 }
 
@@ -97,6 +97,11 @@ export function LiveClassroom({
   /* A full snapshot per publish, and no optimistic local update: the teacher
      sees the toggle move when their own message comes back, which is the same
      moment everyone else sees it. */
+  /* In Class everyone is onstage by definition, so promote only means
+     anything in Lecture. */
+  const isOnstage = (p: ParticipantView) =>
+    mode === 'class' || p.isTeacher || controls.promoted.includes(p.id)
+
   const setControls = (patch: Partial<ClassControls>) => {
     void actions.publish(CLASS_CONTROLS_TOPIC, encodeControls({ ...controls, ...patch }))
   }
@@ -205,14 +210,24 @@ export function LiveClassroom({
           <SidePanel
             panel={panel}
             mode={mode}
-            self={toPerson(self, raisedHands)}
+            self={toPerson(self, raisedHands, isOnstage(self))}
             teacherId={teacherId}
-            people={views.map((p) => toPerson(p, raisedHands))}
+            people={views.map((p) => toPerson(p, raisedHands, isOnstage(p)))}
             waiting={isTeacher ? waiting : EMPTY_QUEUE}
             onRespond={(id, allow) => void actions.respondEntry(id, allow)}
             onMute={actions.muteParticipant}
             onAskToUnmute={actions.askToUnmute}
             onLowerHand={(id) => void actions.publish(HANDS_TOPIC, encodeHand(id, false))}
+            promoted={controls.promoted}
+            onPromote={(id) => {
+              setControls({ promoted: [...controls.promoted, id] })
+              /* The tile is ours to give; the microphone is not. This only
+                 asks, and the student answers on their own screen. */
+              actions.askToUnmute(id)
+            }}
+            onDemote={(id) =>
+              setControls({ promoted: controls.promoted.filter((p) => p !== id) })
+            }
             messages={messages.map((m) => ({
               id: m.key,
               who: m.senderName,

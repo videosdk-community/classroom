@@ -61,11 +61,33 @@ export interface KeepoutRegion {
   rect: (w: number, h: number) => { x: number; y: number; width: number; height: number }
 }
 
+/** Width of tldraw's page menu, which is a fixed pixel size rather than a
+    fraction of the board. App chrome that centres itself on the board is
+    narrower than the board at every size, so on a small board a centred pill
+    reaches back into this. */
+export const PAGE_MENU_WIDTH = 346
+
+/** Height of the collaborator row in the board's top-right corner.
+
+    NOT in the step-0 measurements, because the probe drove a board with one
+    participant in it and the row only appears once somebody else is present.
+    It is where tldraw stacks the avatar chips for everyone on the board, and
+    it grows leftwards as the class does, so anything anchored top-right has
+    to start below it. */
+export const COLLABORATORS_HEIGHT = 40
+
 export const BOARD_KEEPOUT: readonly KeepoutRegion[] = [
   {
     id: 'page-menu',
     label: 'Page menu',
-    rect: () => ({ x: 0, y: 0, width: 346, height: 44 }),
+    rect: () => ({ x: 0, y: 0, width: PAGE_MENU_WIDTH, height: 44 }),
+  },
+  {
+    id: 'collaborators',
+    label: 'Collaborators',
+    /* Grows leftwards with the class, so the width is a guess at a roomful
+       rather than a measurement of two. */
+    rect: (w) => ({ x: w - 200, y: 0, width: 200, height: COLLABORATORS_HEIGHT }),
   },
   {
     id: 'toolbar',

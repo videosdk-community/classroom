@@ -3,6 +3,8 @@ import {
   BOARD_BG,
   BOARD_HARD_FLOOR_WIDTH,
   BOARD_KEEPOUT,
+  COLLABORATORS_HEIGHT,
+  PAGE_MENU_WIDTH,
   isBoardBelowFloor,
   useBaseRect,
 } from '../lib/boardGeometry'
@@ -97,6 +99,16 @@ export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProp
               stroke before it reached the canvas. */}
           <div className="pointer-events-none absolute inset-0">
           {boardOn && !hintDismissed && (
+            /* Centred in what is LEFT of the board, not in the board.
+               tldraw's page menu is a fixed 346px while the board is not, so
+               a pill centred on the board reaches back into the menu as soon
+               as the window gets small - and it does it by overlapping a
+               control, which reads as a broken embed rather than as a layout
+               bug. */
+            <div
+              className="absolute flex justify-center"
+              style={{ left: PAGE_MENU_WIDTH + 12, right: 12, top: 0.022 * rect.height }}
+            >
             <div
               /* pointer-events-auto on the pill itself, because the layer it
                  sits in is pointer-events-none. An iframe swallows nothing and
@@ -104,12 +116,8 @@ export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProp
                  accepts pointer events makes the board undrawable, and that
                  reads as "the embed broke" rather than as a CSS mistake. The
                  rule is enforced by the wrapper below, not by remembering. */
-              className="pointer-events-auto absolute left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-pill py-1.5 pl-3 pr-1.5"
-              style={{
-                top: 0.022 * rect.height,
-                background: 'rgba(9,9,11,.86)',
-                backdropFilter: 'blur(4px)',
-              }}
+              className="pointer-events-auto flex items-center gap-2 rounded-pill py-1.5 pl-3 pr-1.5"
+              style={{ background: 'rgba(9,9,11,.86)', backdropFilter: 'blur(4px)' }}
             >
               {/* The failure here runs opposite to the documented one. The
                   risk is not that a student draws when they should not - it
@@ -128,12 +136,18 @@ export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProp
                 </svg>
               </button>
             </div>
+            </div>
           )}
 
-          {/* Top-right: one of the three regions the probe found free.
-              tldraw's style panel is on the right edge but low down, at
-              y = H-344, so the top of that edge is clear. */}
-          {overlay && <div className="absolute right-4 top-4">{overlay}</div>}
+          {/* Top-right, below the collaborator row. The style panel is on the
+              right edge but low down, at y = H-344, so the top of that edge is
+              clear of it - what is NOT clear is tldraw's avatar chips, which
+              the probe never saw because it drove a board of one. */}
+          {overlay && (
+            <div className="absolute right-4" style={{ top: COLLABORATORS_HEIGHT + 8 }}>
+              {overlay}
+            </div>
+          )}
           </div>
 
           {showKeepout &&

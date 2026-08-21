@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BoardStage } from '../components/BoardStage'
 import { KnockCard } from '../components/KnockCard'
+import { MediaRequestPrompt } from '../components/MediaRequestPrompt'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
@@ -12,6 +13,7 @@ import {
   CHAT_TOPIC,
   useIsRecording,
   useLocalId,
+  useMediaRequest,
   useTeacherId,
   useParticipantIds,
   useParticipantView,
@@ -92,6 +94,10 @@ export function LiveClassroom({
      appear for them. */
   const waiting = useEntryQueue()
 
+  /* Only ever set on the person being asked, so a teacher never sees their
+     own request come back. */
+  const mediaRequest = useMediaRequest()
+
   return (
     <div className="relative flex h-full flex-col bg-canvas">
       <TopBar title={title} mode={mode} recording={recording} elapsed="live" />
@@ -122,6 +128,14 @@ export function LiveClassroom({
             />
           </div>
 
+          {mediaRequest && (
+            <MediaRequestPrompt
+              request={mediaRequest}
+              teacherName={views.find((p) => p.id === mediaRequest.requestedBy)?.name ?? 'Your teacher'}
+              onRespond={actions.respondMediaRequest}
+            />
+          )}
+
           <ControlBar
             micOn={self?.micOn ?? false}
             camOn={self?.camOn ?? false}
@@ -137,9 +151,7 @@ export function LiveClassroom({
               if (whiteboard.url) void actions.stopWhiteboard()
               else void actions.startWhiteboard()
             }}
-            onMuteAll={() => {
-              for (const id of ids) if (id !== localId) actions.muteParticipant(id)
-            }}
+            onMuteAll={actions.muteEveryoneElse}
             chatEnabled={chatEnabled}
             onToggleChatEnabled={setChatEnabled}
             onToggleHandsEnabled={setHandsEnabled}

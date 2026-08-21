@@ -3,6 +3,7 @@ import type {
   EntryDecision,
   EntryRequest,
   LeaveReason,
+  MediaRequest,
   ParticipantView,
   RoomMessage,
   RoomSnapshot,
@@ -32,6 +33,7 @@ const INITIAL: RoomSnapshot = {
   whiteboard: { url: null, inFlight: false, error: null },
   entryQueue: [],
   lastEntryDecision: null,
+  mediaRequest: null,
   leaveReason: null,
   topics: {},
   lastError: null,
@@ -52,6 +54,8 @@ export interface RoomActions {
   toggleMic: () => void
   toggleWebcam: () => void
   muteParticipant: (id: string) => void
+  /** Every remote mic off, in one pass. The SDK has no mute-all. */
+  muteEveryoneElse: () => void
   askToUnmute: (id: string) => void
   startWhiteboard: () => Promise<void>
   stopWhiteboard: () => Promise<void>
@@ -68,6 +72,9 @@ export type PublishFn = (text: string, payload?: Record<string, unknown>) => Pro
 /** What feature code holds: the actions, plus publish routed by topic. */
 export interface RoomFacade extends RoomActions {
   publish: (topic: string, text: string, payload?: Record<string, unknown>) => Promise<void>
+  /** Answer a pending mic or camera request. No SDK call of our own: the
+      answer is a closure the event handed us. */
+  respondMediaRequest: (accept: boolean) => void
 }
 
 /* teacherId comes from api/session.ts, which derives it from room ownership.
@@ -104,6 +111,10 @@ export function createRoomStore(teacherId: string | null = null) {
      entirely. */
   const publishers = new Map<string, PublishFn>()
 
+  /* Same reason as the entry closures: accept/reject are functions, so they
+     are neither comparable nor serialisable and must not enter the snapshot. */
+  let mediaClosures: { accept: () => void; reject: () => void } | null = null
+
   /* A stable facade, built once and handed to every consumer.
 
      The bridges register their real implementations in effects, and React
@@ -127,6 +138,8 @@ export function createRoomStore(teacherId: string | null = null) {
     toggleWebcam: () => (actions ? actions.toggleWebcam() : notReady('toggleWebcam')()),
     muteParticipant: (id) =>
       actions ? actions.muteParticipant(id) : notReady('muteParticipant')(),
+    muteEveryoneElse: () =>
+      actions ? actions.muteEveryoneElse() : notReady('muteEveryoneElse')(),
     askToUnmute: (id) => (actions ? actions.askToUnmute(id) : notReady('askToUnmute')()),
     startWhiteboard: async () => {
       if (actions) await actions.startWhiteboard()
@@ -147,6 +160,14 @@ export function createRoomStore(teacherId: string | null = null) {
         return
       }
       await publisher(text, payload)
+    },
+    respondMediaRequest: (accept) => {
+      const closures = mediaClosures
+      mediaClosures = null
+      commit({ mediaRequest: null })
+      if (!closures) return
+      if (accept) closures.accept()
+      else closures.reject()
     },
   }
 
@@ -254,6 +275,16 @@ export function createRoomStore(teacherId: string | null = null) {
     },
     setEntryDecision: (lastEntryDecision: EntryDecision | null) => commit({ lastEntryDecision }),
 
+    // ---- mic / camera requests -----------------------------------------
+    /* A second request replaces the first, and the first is rejected rather
+       than dropped: leaving it unanswered would hold the asker waiting on a
+       dialog the student can no longer see. */
+    setMediaRequest(row: MediaRequest, closures: { accept: () => void; reject: () => void }) {
+      if (mediaClosures) mediaClosures.reject()
+      mediaClosures = closures
+      commit({ mediaRequest: row })
+    },
+
     // ---- pubsub ---------------------------------------------------------
     appendMessages(topic: string, incoming: readonly RoomMessage[]) {
       if (incoming.length === 0) return
@@ -294,6 +325,7 @@ export function createRoomStore(teacherId: string | null = null) {
     reset() {
       snapshot = { ...INITIAL, teacherId }
       entryClosures.clear()
+      mediaClosures = null
       tracks.clear()
       emit()
     },

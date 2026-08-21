@@ -87,6 +87,18 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
          cannot show a student who has already been answered. */
       store.removeEntryRequest(decision.participantId)
     }) as never,
+    /* Registered on useMeeting, not on useParticipant - the request arrives
+       at the TARGET, and this is where it becomes visible.
+
+       Without these two handlers "Ask to unmute" fires a request that lands
+       on a student who is never told about it, which is how it behaved until
+       now. enableMic/enableWebcam only ever ask; the answer is here. */
+    onMicRequested({ participantId, accept, reject }) {
+      store.setMediaRequest({ kind: 'mic', requestedBy: participantId }, { accept, reject })
+    },
+    onWebcamRequested({ participantId, accept, reject }) {
+      store.setMediaRequest({ kind: 'cam', requestedBy: participantId }, { accept, reject })
+    },
     onError({ code, message }) {
       const numeric = Number(code)
       if (isDuplicateError(numeric, performance.now())) return
@@ -134,6 +146,14 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
          onMicRequested on the target and they choose. A teacher can mute but
          cannot force-unmute, and pretending otherwise in the API would put
          the lie into every call site. */
+      /* The SDK has no mute-all, so it is this loop. `local` is the field on
+         the Participant class - `isLocal` exists only on useParticipant's
+         return, and the doc snippet that uses it here mutes you too. */
+      muteEveryoneElse: () => {
+        for (const participant of ref.current.participants.values()) {
+          if (!participant.local) void participant.disableMic()
+        }
+      },
       askToUnmute: (id) => {
         void ref.current.participants.get(id)?.enableMic()
       },

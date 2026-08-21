@@ -64,6 +64,15 @@ export interface EntryDecision {
   decision: 'allowed' | 'denied'
 }
 
+/* A host asking you to turn your mic or camera on.
+
+   The accept/reject closures arrive on the event and live outside the
+   snapshot with the entry closures. Only the kind and who asked are shown. */
+export interface MediaRequest {
+  kind: 'mic' | 'cam'
+  requestedBy: string
+}
+
 export interface WhiteboardState {
   url: string | null
   /** True while a start or stop is in flight. Ours, not the SDK's - see
@@ -102,6 +111,7 @@ export interface RoomSnapshot {
   whiteboard: WhiteboardState
   entryQueue: readonly EntryRequest[]
   lastEntryDecision: EntryDecision | null
+  mediaRequest: MediaRequest | null
   leaveReason: LeaveReason | null
   topics: Readonly<Record<string, readonly RoomMessage[]>>
   lastError: { code: number; message: string } | null

@@ -65,6 +65,7 @@ const selRecording = (s: RoomSnapshot) => s.isRecording
 const selWhiteboard = (s: RoomSnapshot) => s.whiteboard
 const selEntryQueue = (s: RoomSnapshot) => s.entryQueue
 const selEntryDecision = (s: RoomSnapshot) => s.lastEntryDecision
+const selMediaRequest = (s: RoomSnapshot) => s.mediaRequest
 const selError = (s: RoomSnapshot) => s.lastError
 const selLeaveReason = (s: RoomSnapshot) => s.leaveReason
 
@@ -78,6 +79,8 @@ export const useIsRecording = () => useSelector(selRecording)
 export const useWhiteboard = () => useSelector(selWhiteboard)
 export const useEntryQueue = () => useSelector(selEntryQueue, arrayEqual)
 export const useEntryDecision = () => useSelector(selEntryDecision)
+/** A pending "please turn your mic on" from a host, or null. */
+export const useMediaRequest = () => useSelector(selMediaRequest)
 export const useRoomError = () => useSelector(selError)
 /** Why the meeting ended. The only room-ended signal the SDK has. */
 export const useLeaveReason = () => useSelector(selLeaveReason)

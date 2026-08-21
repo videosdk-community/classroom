@@ -23,6 +23,7 @@ export {
   useWhiteboard,
   useEntryQueue,
   useEntryDecision,
+  useMediaRequest,
   useLeaveReason,
   useRoomError,
   useTopic,
@@ -47,6 +48,7 @@ export type {
   ParticipantView,
   EntryRequest,
   EntryDecision,
+  MediaRequest,
   WhiteboardState,
   RoomMessage,
 } from './types'

@@ -3,7 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Input, Spinner } from '../design/ui'
 import { useAuth } from '../auth/context'
 import { supabase } from '../lib/supabase'
-import mark from '../assets/videosdk-mark.svg'
+import wordmark from '../assets/videosdk-wordmark-white.svg'
 
 /* Sign in with a magic link.
 
@@ -63,15 +63,20 @@ export function SignIn() {
 
   return (
     <div className="flex h-full items-center justify-center bg-canvas p-6">
-      <div
-        className="flex w-full max-w-[400px] flex-col gap-6 rounded-2xl bg-card p-8"
-        style={{ boxShadow: '0 24px 64px rgba(0,0,0,.45), 0 0 0 1px var(--border-default)' }}
-      >
+      <div className="vsdk-enter flex w-full max-w-[400px] flex-col gap-6 rounded-2xl border border-line bg-card p-8 shadow-lg">
+        {/* Wordmark then product name, the way the rest of the VideoSDK surfaces
+            sign themselves. It is a lockup, not the heading, so the h1 below is
+            still the first thing a screen reader announces as the page title. */}
+        <div className="flex items-center gap-3">
+          <img src={wordmark} alt="VideoSDK" className="h-3.5" />
+          <div className="h-4 w-px bg-hairline" />
+          <span className="text-base font-medium text-ink">Classroom</span>
+        </div>
+
         <div className="flex flex-col gap-2">
-          <img src={mark} alt="" className="mb-1 size-8" />
-          <h1 className="text-2xl font-semibold text-ink">Classroom</h1>
+          <h1 className="text-2xl font-semibold text-ink">Sign in</h1>
           <p className="text-base text-ink-secondary">
-            Sign in to start a class or to join one.
+            Start a class, or join one.
           </p>
         </div>
 

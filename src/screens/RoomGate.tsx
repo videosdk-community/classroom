@@ -67,7 +67,12 @@ export function RoomGate({
     (reason: ExitReason) => {
       if (exited.current) return
       exited.current = true
-      actions.leave()
+      /* A room the SDK already dropped us from does not need leaving, and
+         calling leave() anyway throws ERROR_ALREADY_IN_REQUESTED_STATE across
+         the student's console the moment the teacher ends the class. Only the
+         exits we decide ourselves - a denial, the lobby's own buttons - are
+         still connected at this point. */
+      if (reason !== 'ended' && reason !== 'evicted') actions.leave()
       onExitRef.current(reason)
     },
     [actions],

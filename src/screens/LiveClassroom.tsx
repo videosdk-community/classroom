@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BoardStage } from '../components/BoardStage'
 import { HandsChip } from '../components/HandsChip'
 import { KnockCard } from '../components/KnockCard'
@@ -94,6 +95,7 @@ export function LiveClassroom({
   const recording = useIsRecording()
   const whiteboard = useWhiteboard()
   const actions = useRoomActions()
+  const navigate = useNavigate()
   const messages = useTopic(CHAT_TOPIC)
 
   /* The room opens on the board, not on the chat. The board is the product
@@ -205,7 +207,11 @@ export function LiveClassroom({
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">
-      <TopBar title={title} mode={mode} recording={recording} elapsed={elapsed} />
+      {/* Lecture keeps the header. In Class it moves into the control bar,
+          which gives the rail and the board back the 56px. */}
+      {mode === 'lecture' && (
+        <TopBar title={title} mode={mode} recording={recording} elapsed={elapsed} />
+      )}
 
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
@@ -249,6 +255,7 @@ export function LiveClassroom({
           )}
 
           <ControlBar
+            meta={mode === 'class' ? { title, mode, recording, elapsed } : undefined}
             micOn={self?.micOn ?? false}
             camOn={self?.camOn ?? false}
             onToggleMic={actions.toggleMic}
@@ -289,7 +296,17 @@ export function LiveClassroom({
             waitingCount={waiting.length}
             moreOpen={moreOpen}
             onSetMoreOpen={setMoreOpen}
-            onLeave={actions.leave}
+            onLeave={() => {
+              /* The class IS the teacher, so their exit ends it for everyone.
+                 end() is the only way to close the room - leave() would drop
+                 the teacher and leave students in an empty class with a board
+                 nobody owns. Students learn about it from the leave reason. */
+              if (isTeacher) actions.end()
+              else actions.leave()
+              /* Replace rather than push, so Back does not return to a room
+                 this participant has already left. */
+              navigate('/', { replace: true })
+            }}
           />
         </main>
 

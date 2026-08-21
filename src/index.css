@@ -133,6 +133,37 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Browser furniture the design system still owns. The caret and the
+     scrollbar are drawn by the browser, and left alone they are the two
+     places a dark product reverts to platform grey. */
+  input,
+  textarea,
+  [contenteditable] {
+    caret-color: var(--focus-ring);
+  }
+
+  * {
+    scrollbar-color: var(--border-strong) transparent;
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-tertiary);
+  }
+
   a {
     color: var(--text-link);
     text-decoration: none;
@@ -155,6 +186,61 @@
   @keyframes vsdk-spin {
     to {
       transform: rotate(360deg);
+    }
+  }
+
+  /* Entrance. Fade plus an 8px rise, nothing else - the design system's motion
+     budget is 120-260ms of fade and small translate, and content that keeps
+     moving after it lands reads as decoration. Sections stagger by setting
+     animation-delay inline at the call site. */
+  @keyframes vsdk-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .vsdk-enter {
+    animation: vsdk-rise var(--duration-slow) var(--ease-standard) both;
+  }
+
+  /* Skeleton shimmer. The one infinite animation in the app, and it only runs
+     while real content is missing. */
+  @keyframes vsdk-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+
+  .vsdk-skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--surface-inset) 25%,
+      var(--bg-muted) 37%,
+      var(--surface-inset) 63%
+    );
+    background-size: 400% 100%;
+    animation: vsdk-shimmer 1.4s ease infinite;
+  }
+
+  /* Not a nicety. Anyone who has asked the OS for less motion gets the screen
+     with none of it, including the shimmer. */
+  @media (prefers-reduced-motion: reduce) {
+    .vsdk-enter,
+    .vsdk-skeleton {
+      animation: none !important;
+    }
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
     }
   }
 

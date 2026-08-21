@@ -5,7 +5,8 @@ import { RoomGate, type ExitReason } from './RoomGate'
 import { Precall } from './Precall'
 import { RoomProvider, type PrecallTracks } from '../sdk'
 import { useSession } from '../session/useSession'
-import { suggestedName, useAuth } from '../auth/context'
+import { useAuth } from '../auth/context'
+import { readDisplayName } from '../lib/displayName'
 import type { RoomSession } from '../session/types'
 
 /* /c/:roomId - the one way into a class.
@@ -118,7 +119,7 @@ function PrecallThenRoom({
     return (
       <Precall
         title={session.title}
-        suggestedName={suggestedName(user)}
+        name={readDisplayName(user)}
         busy={joining}
         /* Only ever set by a re-knock, so a student sent back here knows why
            they are looking at a device picker again instead of a classroom. */
@@ -191,8 +192,8 @@ const EXIT_COPY: Record<
   },
   ended: {
     tone: 'info',
-    title: 'This class has ended',
-    body: 'The teacher closed it. Ask for a new link if it runs again.',
+    title: 'Teacher left',
+    body: 'The class ended when they left. Ask for a new link if it runs again.',
     canAskAgain: false,
   },
   /* The second-tab collision. participantId is the Supabase user id, so one
@@ -216,6 +217,20 @@ function ExitScreen({
   onHome: () => void
 }) {
   const copy = EXIT_COPY[reason]
+
+  /* The end of a class is not an error, so it does not get an error card. It
+     gets the middle of the screen, at the size of the thing that happened. */
+  if (reason === 'ended') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas p-6 text-center">
+        <span className="text-2xl font-semibold text-ink">{copy.title}</span>
+        <span className="max-w-[420px] text-base text-ink-secondary">{copy.body}</span>
+        <Button size="lg" variant="secondary" className="mt-2" onClick={onHome}>
+          Back to Home
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full items-center justify-center bg-canvas p-6">

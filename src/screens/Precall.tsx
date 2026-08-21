@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { MicMeter } from '../components/MicMeter'
 import { PermissionHelp } from '../components/PermissionHelp'
 import { RoomIcon } from '../components/icons'
-import { Button, Input, Select, Spinner } from '../design/ui'
+import { Button, Select, Spinner } from '../design/ui'
 import { usePrecall, type PrecallTracks } from '../sdk'
 
 /* Precall: check the devices before the class sees you.
@@ -23,8 +23,9 @@ export interface PrecallProps {
   onJoin: (details: JoinDetails) => void
   /** The class being joined, so nobody wonders which link they clicked. */
   title?: string
-  /** Prefilled name, usually the local part of the signed-in email. */
-  suggestedName?: string
+  /** The name the class will see. Chosen on Home, so this screen only
+      carries it through to the join. */
+  name: string
   /** Why someone is looking at this screen a second time. Set only when a
       knock was answered with a no, or ran out of patience - without it, being
       returned to a device picker reads as the app losing its place. */
@@ -32,16 +33,9 @@ export interface PrecallProps {
   busy?: boolean
 }
 
-export function Precall({
-  onJoin,
-  title,
-  suggestedName = '',
-  notice,
-  busy = false,
-}: PrecallProps) {
+export function Precall({ onJoin, title, name, notice, busy = false }: PrecallProps) {
   const p = usePrecall()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [name, setName] = useState(suggestedName)
 
   useEffect(() => {
     const el = videoRef.current
@@ -68,20 +62,22 @@ export function Precall({
     }
   }, [discard])
 
-  const trimmedName = name.trim()
-  const canJoin = trimmedName.length > 0 && !busy
+  /* A blank name never reaches the room. Home allows one, and 'Guest' beats
+     a nameless tile in the participant list. */
+  const joinName = name.trim() || 'Guest'
+  const canJoin = !busy
 
   const join = () => {
     if (!canJoin) return
     joined.current = true
-    onJoin({ tracks: p.handOff(), micOn: p.micOn, camOn: p.camOn, name: trimmedName })
+    onJoin({ tracks: p.handOff(), micOn: p.micOn, camOn: p.camOn, name: joinName })
   }
 
-  /* The bail-out paths below skip the `granted` block entirely, so they carry
-     the name too - otherwise someone whose camera is blocked joins nameless. */
+  /* The bail-out path skips the `granted` block entirely, so it carries the
+     name too - otherwise someone whose camera is blocked joins nameless. */
   const joinWithout = () => {
     joined.current = true
-    onJoin({ tracks: {}, micOn: false, camOn: false, name: trimmedName || 'Guest' })
+    onJoin({ tracks: {}, micOn: false, camOn: false, name: joinName })
   }
 
   return (
@@ -92,23 +88,6 @@ export function Precall({
           {title && <span className="text-base text-ink-secondary">{title}</span>}
           {notice && <span className="text-base text-ink-tertiary">{notice}</span>}
         </div>
-
-        {/* Outside every per-state block on purpose. The blocked and
-            unavailable paths never render the `granted` block, and a name
-            asked for only in there would be skipped by exactly the people who
-            most need to be identifiable in the room. */}
-        <label className="flex w-full max-w-[420px] flex-col gap-1.5">
-          <span className="text-sm text-ink-tertiary">Your name</span>
-          <Input
-            size="lg"
-            required
-            maxLength={60}
-            placeholder="How the class should see you"
-            value={name}
-            error={name.trim() === ''}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
 
         {p.state === 'checking' && <Spinner />}
 
@@ -212,9 +191,6 @@ export function Precall({
                   onChange={(v) => p.setMicrophoneId(v)}
                 />
                 <MicMeter stream={p.micOn ? p.preview : undefined} />
-                <span className="text-sm text-ink-tertiary">
-                  Speak and the bar should move. If it does not, pick another microphone.
-                </span>
               </label>
 
               <Button size="lg" onClick={join} disabled={!canJoin}>

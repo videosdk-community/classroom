@@ -1,6 +1,7 @@
 import { CtrlBtn } from './CtrlBtn'
 import { RoomIcon } from './icons'
 import { Toggle } from '../design/ui'
+import type { ClassMode } from '../domain/classroom'
 
 /* The control bar. Everything the spec's room surface names: self controls,
    the board, teacher controls, panel toggles, leave.
@@ -10,7 +11,19 @@ import { Toggle } from '../design/ui'
 
 export type PanelKind = 'chat' | 'people' | null
 
+/* In Class the top bar is gone and its contents live out here, flanking the
+   controls, so the rail and the board keep the 56px the header used to take.
+   Lecture still has the header, and passes no meta. */
+export interface ControlBarMeta {
+  title: string
+  mode: ClassMode
+  recording: boolean
+  elapsed: string
+}
+
 export interface ControlBarProps {
+  meta?: ControlBarMeta
+
   micOn: boolean
   camOn: boolean
   camDisabled?: boolean
@@ -47,6 +60,7 @@ export interface ControlBarProps {
 }
 
 export function ControlBar({
+  meta,
   micOn,
   camOn,
   camDisabled,
@@ -75,6 +89,47 @@ export function ControlBar({
 }: ControlBarProps) {
   return (
     <div className="relative flex h-16 shrink-0 items-center justify-center gap-2 border-t border-line px-3">
+      {/* Absolute, so the controls stay centred on the window rather than on
+          whatever is left after the title. */}
+      {meta && (
+        <div className="pointer-events-none absolute left-4 flex min-w-0 items-center gap-3">
+          <span className="hidden truncate text-base font-semibold text-ink lg:block">
+            {meta.title}
+          </span>
+          <span className="hidden rounded-md bg-inset px-2 py-0.5 text-xs uppercase tracking-wide text-ink-tertiary lg:inline">
+            {meta.mode}
+          </span>
+
+          {/* Never hidden at any width. A cold student named the absence of a
+              recording indicator as the thing that would stop them unmuting
+              or turning a camera on, and the recording genuinely does capture
+              the board, the ink and live cursors with name tags. */}
+          {meta.recording && (
+            <span
+              className="flex shrink-0 items-center gap-1.5 rounded-pill px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
+              style={{ background: 'var(--danger-bg)', color: 'var(--danger-fg)' }}
+            >
+              <RoomIcon name="record" size={11} />
+              Recording
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* The clock counts from the moment this participant mounted, not from
+          when the class actually started, because the SDK gives us no session
+          start time to anchor on. */}
+      {meta && (
+        <div className="pointer-events-none absolute right-4 hidden items-center gap-2 text-sm text-ink-tertiary sm:flex">
+          <span
+            className="h-1.5 w-1.5 rounded-pill"
+            style={{ background: 'var(--red-600)' }}
+          />
+          <span className="font-medium text-ink-secondary">Live</span>
+          {meta.elapsed}
+        </div>
+      )}
+
       <CtrlBtn
         label={micOn ? 'Mute yourself' : 'Unmute yourself'}
         off={!micOn}
@@ -191,7 +246,15 @@ export function ControlBar({
 
       <div className="mx-2 h-6 w-px bg-line" />
 
-      <CtrlBtn label="Leave class" text="Leave" danger onClick={onLeave}>
+      {/* The teacher's exit closes the room for everyone, so the button says
+          so. "Leave" on a control that ends the class for forty people is a
+          lie the first teacher finds out about the hard way. */}
+      <CtrlBtn
+        label={isTeacher ? 'End class for everyone' : 'Leave class'}
+        text={isTeacher ? 'End' : 'Leave'}
+        danger
+        onClick={onLeave}
+      >
         <RoomIcon name="phoneOff" size={18} />
       </CtrlBtn>
 

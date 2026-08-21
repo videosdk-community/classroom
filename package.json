@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
-    "dev:vite": "vite",
+    "dev": "vite --port 3000",
+    "dev:api": "vercel dev --listen 3000",
     "build": "tsc -b && vite build && node scripts/check-bundle-secrets.mjs",
     "lint": "oxlint",
     "preview": "vite preview",

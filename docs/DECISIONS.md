@@ -258,18 +258,29 @@ should not be mistaken for an identity.
   which signs a token the API rejects with *"'apikey' provided in the token is empty or invalid"* -
   a message that blames the key rather than the whitespace.
 
-## Local development runs `vercel dev`, on port 3000
+## Local development: two servers, both on port 3000
 
-`pnpm dev` is `vercel dev`, which serves the SPA and `api/` from one origin. Plain `vite` has no
-`/api` at all, so a sign-in there fails on a request that returns `index.html` instead of JSON -
-`apiPost` detects that shape and says so by name rather than surfacing a parse error. `pnpm
-dev:vite` remains for pure UI work.
+`pnpm dev:api` is `vercel dev`, which serves the SPA and `api/` from one origin.
+`pnpm dev` is plain Vite, for UI work, with no `/api` at all - a sign-in there
+fails on a request that returns `index.html` instead of JSON, and `apiPost`
+detects that shape and says so by name rather than surfacing a parse error.
 
-This is why the Supabase redirect allowlist must contain `http://localhost:3000/**` and **not**
-5173: allow-listing 5173 invites someone to run the wrong dev server and lose an hour.
+**Both listen on 3000**, and that is deliberate rather than tidy. Vite's default
+is 5173, which would mean the Supabase redirect allowlist had to contain two
+origins and that running the wrong server cost an hour before anyone noticed.
+Pinning both to one port makes the only difference between them the thing that
+actually differs: whether `/api` exists. The allowlist needs
+`http://localhost:3000/**` and nothing else.
 
-`vercel.json`'s SPA rewrite excludes the API with a negative lookahead. Without it every function
-call returns `index.html` with a 200.
+**`vercel dev` cannot be the `dev` script.** It refuses to start with
+*"`vercel dev` must not recursively invoke itself"*, because it reads
+`package.json`'s `dev` script to decide what to run and finds itself. It reads
+that **before** `vercel.json`'s `devCommand`, so setting `devCommand` alone does
+not fix it - the script names have to be the way round they are now. That is
+why the full-stack script is `dev:api` and not `dev`.
+
+`vercel.json`'s SPA rewrite excludes the API with a negative lookahead. Without
+it every function call returns `index.html` with a 200.
 
 ## Signing in during development, without the email
 

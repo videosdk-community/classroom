@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react'
+import { CLASS_CONTROLS_TOPIC, HANDS_TOPIC } from './topics'
+import { foldControls, foldHands, type ClassControls } from './controls'
 import type { RoomStore } from './store'
 import type { ParticipantView, RoomMessage, RoomSnapshot } from './types'
 
@@ -129,3 +131,39 @@ export function useTrack(id: string, kind: 'mic' | 'cam') {
   const get = useCallback(() => store.getTrack(id, kind), [store, id, kind])
   return useSyncExternalStore(subscribe, get, get)
 }
+
+/* Class controls and raised hands, folded from their topics.
+
+   Both go through useSelector rather than a useMemo in the component, because
+   that is what gives them a stable reference: the version cache computes each
+   fold at most once per commit and keeps the previous object when the
+   comparison says nothing changed. A fresh Set on every chat message would
+   re-render every tile in the room. */
+
+function sameControls(a: ClassControls, b: ClassControls) {
+  return (
+    a.chatEnabled === b.chatEnabled &&
+    a.handsEnabled === b.handsEnabled &&
+    a.promoted.length === b.promoted.length &&
+    a.promoted.every((id, i) => id === b.promoted[i])
+  )
+}
+
+function sameSet(a: ReadonlySet<string>, b: ReadonlySet<string>) {
+  if (a.size !== b.size) return false
+  for (const v of a) if (!b.has(v)) return false
+  return true
+}
+
+const selControls = (s: RoomSnapshot) =>
+  foldControls(s.topics[CLASS_CONTROLS_TOPIC] ?? EMPTY, s.teacherId)
+
+const selHands = (s: RoomSnapshot) =>
+  foldHands(s.topics[HANDS_TOPIC] ?? EMPTY, s.teacherId, s.participantIds)
+
+/** Chat, hand-raising and the promoted list, as the teacher last published
+    them. Everything on is what an empty log means. */
+export const useClassControls = () => useSelector(selControls, sameControls)
+
+/** Who has a hand up, narrowed to participants still in the room. */
+export const useRaisedHands = () => useSelector(selHands, sameSet)

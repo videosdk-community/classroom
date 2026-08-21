@@ -8,7 +8,8 @@
    module-level constant, and an exported useSelector would invite inline
    arrows that silently read stale values. */
 
-export { RoomProvider, CHAT_TOPIC, CLASS_CONTROLS_TOPIC } from './RoomProvider'
+export { RoomProvider } from './RoomProvider'
+export { CHAT_TOPIC, CLASS_CONTROLS_TOPIC, HANDS_TOPIC } from './topics'
 export type { RoomProviderProps } from './RoomProvider'
 
 export {
@@ -25,6 +26,8 @@ export {
   useLeaveReason,
   useRoomError,
   useTopic,
+  useClassControls,
+  useRaisedHands,
   useRoomActions,
   useTrack,
 } from './hooks'
@@ -47,6 +50,9 @@ export type {
   WhiteboardState,
   RoomMessage,
 } from './types'
+
+export { encodeControls, encodeHand, DEFAULT_CONTROLS } from './controls'
+export type { ClassControls } from './controls'
 
 export { usePrecall } from './media/usePrecall'
 export type { PrecallState, PrecallTracks } from './media/usePrecall'

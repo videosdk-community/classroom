@@ -7,6 +7,7 @@ import { WhiteboardBridge } from './bridges/WhiteboardBridge'
 import { RemoteAudio } from './RemoteAudio'
 import { RoomStoreContext } from './hooks'
 import { createRoomStore } from './store'
+import { CHAT_TOPIC, CLASS_CONTROLS_TOPIC, HANDS_TOPIC } from './topics'
 
 /* The single mount point. MeetingProvider plus every bridge, all of which
    render nothing.
@@ -17,8 +18,6 @@ import { createRoomStore } from './store'
    therefore have to be in hand before this component mounts, which is why
    precall must be a sibling screen and not something rendered inside here. */
 
-export const CLASS_CONTROLS_TOPIC = 'CLASS_CONTROLS'
-export const CHAT_TOPIC = 'CHAT'
 
 export interface RoomProviderProps {
   meetingId: string
@@ -85,6 +84,10 @@ export function RoomProvider({
         {/* persist so a late joiner picks up the current toggles through
             onOldMessagesReceived rather than starting with chat re-enabled. */}
         <PubSubBridge topic={CLASS_CONTROLS_TOPIC} store={store} persist />
+        {/* Persisted too, so a student's hand survives their own reload and a
+            teacher who joins late still sees who is asking. Hands from people
+            who have since left are dropped when the log is folded, not here. */}
+        <PubSubBridge topic={HANDS_TOPIC} store={store} persist />
         <RemoteAudio />
         {children}
       </RoomStoreContext.Provider>

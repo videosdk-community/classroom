@@ -18,5 +18,10 @@ Built in step 4. What lands here:
     unrecognised rather than crashing.
   - Whiteboard error codes 4054 / 4055 / 4056 mapped to human sentences, and the
     in-flight disable that 4056 implies.
-  - Pubsub messages carry **no id field** - synthesise React keys. Do not sort by
+  - Pubsub messages **do** carry an id, built as `messageId || ""`. The hazard is
+    the empty string: falsy, equal to every other empty string, so `key={m.id}`
+    collides silently. Keys are synthesised at the seam. Do not sort by
     `timestamp`; its clock domain is unestablished.
+  - Publish is routed by topic through a registry in the store. Each PubSubBridge
+    registers the publisher for the topic it owns and `persist` rides with it, so
+    no caller can publish class-control state unpersisted.

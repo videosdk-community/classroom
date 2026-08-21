@@ -34,6 +34,20 @@ input. **Nothing server-side stops a crafted publish.**
 `allow_mod` is the only real enforcement anywhere in the room. Real classroom
 control, client-honored - and it is worth being exact about which is which.
 
+Every message carries the **whole** control state rather than a delta, and only
+messages whose `senderId` matches the server-derived `teacherParticipantId` count.
+A full snapshot means replay order cannot leave one client with chat off and
+hands on. The sender check means no student can publish the class into a state
+the teacher did not choose - which is a real narrowing, not enforcement: the
+teacher's own client is all that stands between that account and a crafted
+publish.
+
+Raised hands ride the same mechanism on a `HANDS` topic, also persisted, so a
+hand survives the raiser's reload and reaches a teacher who joins later. The fold
+is narrowed to participants still in the room, so a hand raised by someone who
+has since left does not live on in the replay. Anyone may raise or lower their
+own hand; only the teacher may lower somebody else's.
+
 ## Mode is fixed at room creation
 
 Class vs Lecture is chosen once on Home, stored as `public.rooms.mode`, and
@@ -47,8 +61,14 @@ see and hear me?" - because a chip flipping from `CLASS` to `LECTURE` reads as
 decoration, not as news. Neither cost buys anything the campaign needs.
 
 Both modes are layout plus convention. **Lecture makes no claim to lock the
-audience out of the board.** What promote-to-stage grants is mic and camera,
-enforced by `allow_mod`.
+audience out of the board.**
+
+Promote is layout plus a request. It puts a student's tile on the Lecture stage
+for everyone, then calls `enableMic()`, which only asks: the SDK fires
+`onMicRequested` on the student and they accept or reject. **A teacher can mute
+but cannot force-unmute.** `disableMic()` lands immediately with no consent;
+there is no opposite anywhere in the SDK, so the action is named "Ask to unmute"
+and demote takes the tile back without touching the microphone.
 
 ## Students knock - the lobby is real product surface
 

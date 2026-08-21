@@ -108,7 +108,7 @@ export function LiveClassroom({
 
           <div className="min-h-0 flex-1 p-6">
             <BoardStage
-              boardOn={Boolean(whiteboard.url)}
+              url={whiteboard.url}
               overlay={
                 isTeacher ? (
                   <KnockCard

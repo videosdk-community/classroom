@@ -10,18 +10,20 @@ import {
 /* The board region.
 
    This is a stacking context on purpose: the board itself sits underneath and
-   app chrome sits above it. In step 4 the <img> below becomes the SDK's
-   whiteboardUrl in an iframe and nothing else in this file changes.
+   app chrome sits above it.
 
-   Step 3 renders the real board rather than a drawing of one. The image is
-   the step-0 probe capture, straight out of assets/probe/, so the dark
-   surround is being judged against the actual thing and not against a mimic.
-   The prototype's mimic put tldraw's tool rail on the left and its style
-   panel top-right; both are wrong, and judging a surround against a wrong
-   board is how you ship a surround that only works in a screenshot. */
+   The board is the hosted page at whiteboardUrl, in an iframe. It carried the
+   step-0 probe screenshot until step 8, which is why the surround was tuned
+   against the real thing from the start - the prototype's mimic put tldraw's
+   tool rail on the left and its style panel top-right, and both are wrong.
+   The iframe needs no sandbox loosening and no allow list: it embeds cleanly
+   on a foreign origin, measured in step 0. */
 
 export interface BoardStageProps {
-  boardOn: boolean
+  /** The SDK's whiteboardUrl. Null until somebody starts the board, which is
+      the only signal any participant gets that it is open - there are no
+      whiteboard events on useMeeting at all. */
+  url: string | null
   /** App chrome that must sit over the board and inside its edges.
 
       It goes in here rather than in the parent because the board is
@@ -35,7 +37,8 @@ export interface BoardStageProps {
   showKeepout?: boolean
 }
 
-export function BoardStage({ boardOn, overlay, showKeepout = false }: BoardStageProps) {
+export function BoardStage({ url, overlay, showKeepout = false }: BoardStageProps) {
+  const boardOn = url !== null
   const { ref, rect } = useBaseRect()
   const [hintDismissed, setHintDismissed] = useState(false)
   const squeezed = isBoardBelowFloor(rect)
@@ -59,11 +62,14 @@ export function BoardStage({ boardOn, overlay, showKeepout = false }: BoardStage
           }}
         >
           {boardOn ? (
-            <img
-              src="/board-probe-1280x720.png"
-              alt="Whiteboard"
-              className="h-full w-full object-cover"
-              draggable={false}
+            <iframe
+              src={url}
+              title="Whiteboard"
+              /* No border of its own - the container already draws the
+                 hairline and the radius, and a second edge inside it reads as
+                 a rendering seam. */
+              className="h-full w-full border-0"
+              allow="clipboard-write"
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">

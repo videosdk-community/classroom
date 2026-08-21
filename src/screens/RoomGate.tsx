@@ -11,6 +11,7 @@ import {
   useRoomStatus,
 } from '../sdk'
 import type { ClassMode } from '../domain/classroom'
+import { ToastProvider } from '../design/ui'
 
 /* What you see between mounting the meeting and being in the class.
 
@@ -104,7 +105,14 @@ export function RoomGate({
   }, [leaveReason, exit])
 
   if (status === 'connected') {
-    return <LiveClassroom mode={mode} title={title} isTeacher={isTeacher} />
+    /* The provider lives here rather than inside LiveClassroom, because that
+       screen is itself the biggest caller of useToast and a component cannot
+       consume a context it renders. */
+    return (
+      <ToastProvider>
+        <LiveClassroom mode={mode} title={title} isTeacher={isTeacher} />
+      </ToastProvider>
+    )
   }
 
   /* A student is not "joining" - they are knocking, and the difference is the

@@ -111,20 +111,19 @@ export function LiveClassroom({
             </div>
           )}
 
-          {/* The board region is the stacking context: iframe underneath,
-              app chrome above. The knock card sits top-right, which step 0
-              measured as free - tldraw's own furniture is top-left (page
-              menu), bottom (toolbar), right edge low down (style panel) and
-              bottom-left (zoom). */}
-          <div className="relative min-h-0 flex-1 p-6">
-            <BoardStage boardOn={Boolean(whiteboard.url)} />
-            {isTeacher && (
-              <KnockCard
-                waiting={waiting}
-                onRespond={(id, allow) => void actions.respondEntry(id, allow)}
-                onSeeAll={() => setPanel('people')}
-              />
-            )}
+          <div className="min-h-0 flex-1 p-6">
+            <BoardStage
+              boardOn={Boolean(whiteboard.url)}
+              overlay={
+                isTeacher ? (
+                  <KnockCard
+                    waiting={waiting}
+                    onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+                    onSeeAll={() => setPanel('people')}
+                  />
+                ) : undefined
+              }
+            />
           </div>
 
           <ControlBar

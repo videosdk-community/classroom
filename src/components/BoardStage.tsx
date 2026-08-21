@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   BOARD_BG,
   BOARD_HARD_FLOOR_WIDTH,
@@ -22,12 +22,20 @@ import {
 
 export interface BoardStageProps {
   boardOn: boolean
+  /** App chrome that must sit over the board and inside its edges.
+
+      It goes in here rather than in the parent because the board is
+      ratio-locked and centred: on a short window the fitted rect is narrower
+      than the region around it, so anything anchored to the container hangs
+      off the board's edge and into the surround. Rendered in the
+      pointer-events-none layer, so an interactive leaf must opt back in. */
+  overlay?: ReactNode
   /** Dev-only. Paints the regions tldraw's own furniture occupies, so app
       chrome can be checked against them rather than placed by eye. */
   showKeepout?: boolean
 }
 
-export function BoardStage({ boardOn, showKeepout = false }: BoardStageProps) {
+export function BoardStage({ boardOn, overlay, showKeepout = false }: BoardStageProps) {
   const { ref, rect } = useBaseRect()
   const [hintDismissed, setHintDismissed] = useState(false)
   const squeezed = isBoardBelowFloor(rect)
@@ -116,6 +124,10 @@ export function BoardStage({ boardOn, showKeepout = false }: BoardStageProps) {
             </div>
           )}
 
+          {/* Top-right: one of the three regions the probe found free.
+              tldraw's style panel is on the right edge but low down, at
+              y = H-344, so the top of that edge is clear. */}
+          {overlay && <div className="absolute right-4 top-4">{overlay}</div>}
           </div>
 
           {showKeepout &&

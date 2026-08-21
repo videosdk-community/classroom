@@ -1,29 +1,35 @@
 import { ChatPanel } from './ChatPanel'
+import { LectureStage } from './LectureStage'
 import { PeoplePanel } from './PeoplePanel'
-import { Tile } from './Tile'
 import { RoomIcon } from './icons'
 import { cn } from '../design/ui'
 import type { PanelKind } from './ControlBar'
 import type { ChatMessage, ClassMode, Person } from '../domain/classroom'
 import type { EntryRequest } from '../sdk'
 
-/* The right-hand panel, 320px.
+/* The right-hand column, 320px.
 
-   In Lecture it also carries the stage. One face across a 112px full-width
-   band is waste, so the rail unmounts and the teacher moves into the panel's
-   top slot instead - "teacher onstage, students listed below", exactly as the
-   spec puts it.
+   In Lecture it also carries the stage, so this component outlives the panel
+   itself: `panel` may be null while the lecture stage is still mounted, which
+   is what keeps the teacher's face on screen after somebody hides the chat.
+   "Teacher onstage, students listed below", exactly as the spec puts it - the
+   students being the roster one toggle away.
 
-   The tile in that slot is 4:3, not 16:9. Panel width drives tile width here,
-   and in a narrow column 4:3 buys real vertical presence where 16:9 would
-   give a letterbox strip. */
+   When the window is too narrow for a column beside the board, the whole
+   thing floats instead, and hiding the panel takes the lecture stage with it.
+   That is the rule from step 3 applied honestly: the board is the product,
+   and the panel yields to it first. */
 
 export const SIDE_PANEL_WIDTH = 320
 
 export interface SidePanelProps {
-  panel: Exclude<PanelKind, null>
+  /** Null means no chat and no roster - only the Lecture stage, which is the
+      one thing in this column that is not dismissible. */
+  panel: PanelKind
   mode: ClassMode
   self: Person
+  /** Server-derived. Null until the teacher's participant row arrives. */
+  teacherId: string | null
   people: Person[]
   messages: ChatMessage[]
   /** Students knocking. Empty for anyone without allow_mod. */
@@ -42,6 +48,7 @@ export function SidePanel({
   panel,
   mode,
   self,
+  teacherId,
   people,
   messages,
   waiting,
@@ -64,28 +71,27 @@ export function SidePanel({
       }}
     >
       {mode === 'lecture' && (
-        <div className="shrink-0 border-b border-line p-3">
-          <Tile person={self} self className="aspect-[4/3] w-full" />
+        <LectureStage teacherId={teacherId} selfId={self.id} isTeacher={self.role === 'teacher'} />
+      )}
+
+      {panel && (
+        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
+          <RoomIcon name={panel === 'chat' ? 'chat' : 'users'} size={15} className="text-ink-tertiary" />
+          <span className="text-base font-semibold text-ink">
+            {panel === 'chat' ? 'Messages' : `People (${people.length})`}
+          </span>
+          <button
+            type="button"
+            onClick={onHide}
+            className="ml-auto cursor-pointer border-0 bg-transparent p-0 text-sm text-ink-tertiary hover:text-ink"
+          >
+            Hide
+          </button>
         </div>
       )}
 
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-        <RoomIcon name={panel === 'chat' ? 'chat' : 'users'} size={15} className="text-ink-tertiary" />
-        <span className="text-base font-semibold text-ink">
-          {panel === 'chat' ? 'Messages' : `People (${people.length})`}
-        </span>
-        <button
-          type="button"
-          onClick={onHide}
-          className="ml-auto cursor-pointer border-0 bg-transparent p-0 text-sm text-ink-tertiary hover:text-ink"
-        >
-          Hide
-        </button>
-      </div>
-
-      {panel === 'chat' ? (
-        <ChatPanel messages={messages} enabled={chatEnabled} />
-      ) : (
+      {panel === 'chat' && <ChatPanel messages={messages} enabled={chatEnabled} />}
+      {panel === 'people' && (
         <PeoplePanel
           people={people}
           selfId={self.id}

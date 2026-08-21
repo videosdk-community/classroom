@@ -161,11 +161,17 @@ export function LiveClassroom({
           />
         </main>
 
-        {panel && self && (
+        {/* The column survives a hidden panel in Lecture, because the stage
+            inside it is the only place the teacher's face exists in that
+            mode. Once the window is narrow enough that the column floats, it
+            goes away with the panel like everything else - the board keeps
+            the width. */}
+        {self && (panel || (mode === 'lecture' && !overlayPanel)) && (
           <SidePanel
             panel={panel}
             mode={mode}
             self={toPerson(self)}
+            teacherId={teacherId}
             people={views.map(toPerson)}
             waiting={isTeacher ? waiting : EMPTY_QUEUE}
             onRespond={(id, allow) => void actions.respondEntry(id, allow)}

@@ -4,25 +4,54 @@ Why this app is shaped the way it is. Written as engineering precision, not as
 apology. Anything recorded here is settled - reopen it with new evidence, not
 with an argument.
 
-## The board has no permission model
+## The board's permission is a URL parameter, not an SDK member
 
 `useWhiteboard()` has exactly three members: `startWhiteboard`, `stopWhiteboard`,
-`whiteboardUrl`. No role, no read-only, no URL parameters, and no whiteboard
-events on `useMeeting` at all - the board's state reaches other participants only
-as `whiteboardUrl` flipping non-null.
+`whiteboardUrl`. No role, no read-only flag, and no whiteboard events on
+`useMeeting` at all - the board's state reaches other participants only as
+`whiteboardUrl` flipping non-null.
 
-Two consequences we do not paper over:
+The hosted board is a second surface, and it does have one. Appending
+`drawOnWhiteboard=false` to `whiteboardUrl` loads it read-only. Nothing in the
+React docs mentions it; Prebuilt documents the same lever as
+`permissions.drawOnWhiteboard`, and VideoSDK's own team appends it by hand.
+`src/lib/boardSrc.ts` is where this app adds it.
 
-- **Anyone who loads the board can draw on it.** There is no supported way to
-  hand out or withhold the pen. The UI says so, because a student's first
-  instinct is that the board is something to watch rather than something to
-  touch, and they will not draw unless told they may.
+Measured on 2026-08-22 against a live board, two browsers. Read-only:
+
+- refuses every stroke, from every tool
+- drops the toolbar and the style panel entirely
+- keeps the page menu, the zoom menu and the minimap toggle
+- kills pointer panning, ctrl-wheel zoom and middle-drag pan with the toolbar
+- leaves the zoom menu working - zoom in, zoom out, 100%, zoom to fit, zoom to
+  selection, and their keyboard equivalents
+
+That last line is the one that matters to a student. Everyone shares one canvas
+but each has their own camera, so a teacher who draws off to one side leaves the
+class looking at blank board. Zoom to fit is how they catch up.
+
+The app used to enforce read-only itself, with a transparent
+`pointer-events: auto` div over the iframe. An iframe blocks everything, so that
+layer stopped strokes and stopped panning and zooming along with them - the
+student was pinned to whatever camera the board loaded with, permanently. The
+parameter replaces it.
+
+What we still do not paper over:
+
+- **A URL parameter is not enforcement.** It rides in a URL the participant can
+  read out of the DOM and re-open without it. `allow_mod` remains the only
+  server-side control in this app. This is the same class of guarantee as the
+  class-control toggles.
 - **"Only the teacher starts the board" is a UI convention in this app, not an
   SDK guarantee.** `startWhiteboard` and `stopWhiteboard` are not permission
   gated; any participant holding a meeting token can call them.
+- **Follow-the-teacher does not exist.** The hosted build renders no
+  collaborator chips, and the SDK has no viewport, camera or postMessage
+  surface, so one participant's camera cannot be driven from another's.
 
-Interactive live streaming does not fix this. ILS controls who publishes media,
-not who draws, and whiteboard appears nowhere in its docs. This app is plain RTC.
+Interactive live streaming does not fix any of this. ILS controls who publishes
+media, not who draws, and whiteboard appears nowhere in its docs. This app is
+plain RTC.
 
 ## Class controls are broadcast state, not enforcement
 
@@ -148,10 +177,43 @@ calling them from feature components multiplies subscriptions invisibly. Each is
 subscribed once in a bridge component that renders nothing and pushes into a
 store; feature hooks read that store through `useSyncExternalStore`.
 
-## No screen share
+## Screen share covers the board, and only the teacher gets the control
 
-It competes with the board for centre stage, in a campaign whose entire angle is
-that the board *is* the class.
+This started as "no screen share", on the grounds that it competes with the
+board for centre stage in a campaign whose entire angle is that the board *is*
+the class. The competition is real; the answer is to resolve it on screen
+rather than to refuse the feature. A share takes centre stage while it runs and
+the board comes back the moment it stops, so the two are never arguing over the
+same rectangle.
+
+`ScreenStage` **covers** `BoardStage` rather than replacing it. Unmounting the
+board would unmount the whiteboard iframe, and an iframe that remounts reloads -
+the class would watch the board blank and redraw itself at the end of every
+demo.
+
+`object-contain`, never `cover`. This is the one video in the app where
+cropping loses the content.
+
+The control is teacher-only in exactly the sense the board control is: a
+convention, not a permission. Any token holder can call `enableScreenShare`. The
+honest surface is the stage, which names whoever is presenting instead of
+assuming it is the teacher.
+
+Presence comes from `onPresenterChanged` and nowhere else - not from a local
+flag, not from polling `screenShareOn` across the roster. It is the only signal
+that catches the browser's own "Stop sharing" bar, which no app-side click can
+listen for. One presenter at a time is the SDK's model, so the control disables
+itself when somebody else has the stage rather than failing on the click.
+
+`toggleScreenShare()` wraps `getDisplayMedia`, so a dismissed picker **rejects**
+with `NotAllowedError`. That is a teacher changing their mind, not a fault, and
+it is swallowed at the seam. `getDisplayMedia` is absent on mobile and tablet
+browsers entirely, which the control says rather than opening nothing.
+
+Tab audio arrives as a separate `screenShareAudioStream` and is not played.
+`RemoteAudio` owns audio, one `<audio>` per participant with the local one
+skipped, and a second audio path would reintroduce the feedback howl that
+arrangement exists to prevent.
 
 ## What the SDK actually does, where the docs and typings disagree
 

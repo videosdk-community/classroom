@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { boardSrc } from '../lib/boardSrc'
 import {
   BOARD_BG,
   BOARD_HARD_FLOOR_WIDTH,
@@ -35,15 +36,16 @@ export interface BoardStageProps {
   overlay?: ReactNode
   /** Whether this participant is meant to draw.
 
-      A UI convention, not a permission. useWhiteboard() exposes exactly three
-      members - startWhiteboard, stopWhiteboard, whiteboardUrl - so there is no
-      role to send, no read-only flag and no URL parameter the hosted board
-      would honour. Everything false does here happens on this side of the
-      iframe: any token holder can still start or stop the board, and a student
-      who opens devtools can delete the guard div and draw. It is the same
-      class of guarantee ControlBar.tsx already writes down, where only muting
-      is enforced server-side. Required rather than defaulted, because a
-      forgotten prop must not silently hand a student the pen. */
+      False puts the hosted board itself in read-only mode, through the
+      drawOnWhiteboard=false query parameter (see boardSrc below). It is not a
+      server-side permission - the parameter rides in a URL the participant can
+      read and re-open without it - but the refusal happens inside the board
+      rather than in a layer this app draws over it. That distinction is the
+      whole feature: the app used to block the board with a transparent div,
+      which stopped strokes and stopped panning and zooming with them.
+
+      Required rather than defaulted, because a forgotten prop must not
+      silently hand a student the pen. */
   canDraw: boolean
   /** Dev-only. Paints the regions tldraw's own furniture occupies, so app
       chrome can be checked against them rather than placed by eye. */
@@ -75,7 +77,7 @@ export function BoardStage({ url, overlay, canDraw, showKeepout = false }: Board
         >
           {boardOn ? (
             <iframe
-              src={url}
+              src={boardSrc(url, canDraw)}
               title="Whiteboard"
               /* No border of its own - the container already draws the
                  hairline and the radius, and a second edge inside it reads as
@@ -92,33 +94,6 @@ export function BoardStage({ url, overlay, canDraw, showKeepout = false }: Board
                 {canDraw ? 'Opening it for the class.' : 'Your teacher starts it for the class.'}
               </span>
             </div>
-          )}
-
-          {/* The read-only guard, and the one place in this file where the
-              iframe's worst property is the point rather than the hazard.
-
-              The pill's comment below records it as a trap: an iframe
-              swallows nothing and blocks everything, so a transparent layer
-              that accepts pointer events makes the board undrawable. That is
-              exactly the effect wanted here, so this layer opts into pointer
-              events on purpose and every stroke dies on it.
-
-              Invisible on purpose. It paints nothing over the board and dims
-              none of the board's own controls: a student watching a lesson
-              should see the board the teacher sees, and a scrim over the tool
-              rail reads as a rendering fault rather than as a rule. The tools
-              are simply inert, which is what "watch this" looks like.
-
-              It sits after the iframe but BEFORE the pointer-events-none
-              overlay layer, so teacher chrome still paints and still clicks
-              through to its own leaves. Flip the two and the guard would
-              cover the chrome as well. */}
-          {boardOn && !canDraw && (
-            <div
-              className="absolute inset-0"
-              style={{ pointerEvents: 'auto', cursor: 'default' }}
-              aria-hidden="true"
-            />
           )}
 
           {/* Overlay chrome. Positions are fractions of the base rect rather

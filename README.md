@@ -17,10 +17,11 @@
 
 ---
 
-A teacher opens a class, students knock to get in, and the lesson happens on a board the whole
-class watches live, with video, chat and raised hands around it. Rooms, tokens, video, audio, chat,
-recording and the whiteboard itself are all VideoSDK. There is no second real-time vendor anywhere
-in the app.
+A teacher opens a class and teaches on a whiteboard the whole room watches live, with video, chat
+and raised hands arranged around it. Students knock to get in and the teacher lets them through.
+Every real-time piece of that is VideoSDK. The rooms, the tokens, the video and audio, the chat, the
+recording and the whiteboard all come from one platform, and no second vendor appears anywhere in
+the app.
 
 The whole product turns on one hook with three members:
 
@@ -37,9 +38,9 @@ mechanism. Render it in an iframe and a video call is a teaching surface.
 
 ## What is in the app
 
-- **One board, the teacher's pen.** The teacher starts the board and draws; every student gets the
-  same board live, read-only, with the zoom menu still working so they can reach anything drawn
-  off-screen.
+- **One board, the teacher's pen.** The teacher opens the board and draws on it. Every student watches the same strokes land in real
+  time on a board they cannot draw on, and keeps the zoom menu, so nothing drawn off-screen is out
+  of reach.
 - **Two class shapes.** Class puts everyone onstage with a video rail. Lecture puts the teacher
   onstage and lists students below, with promote-to-stage. Mode is picked at creation and fixed for
   the life of the room.
@@ -173,14 +174,14 @@ None of this is a workaround. It is what the platform offers, written down so yo
 it instead of discovering it late. `docs/DECISIONS.md` carries the reasoning and the probe evidence.
 
 - **The pen is a URL parameter, not an SDK permission.** `useWhiteboard` is three members and none
-  of them is a role, so the hook cannot tell a teacher from a student. The hosted board does honour
-  `&drawOnWhiteboard=false`, undocumented on the React path and documented for Prebuilt as
-  `permissions.drawOnWhiteboard`. `src/lib/boardSrc.ts` appends it for everyone but the teacher,
-  which refuses every stroke and hides the toolbar and style panel. Two things follow. Read-only
-  costs pointer panning and ctrl-wheel zoom, so the bottom-left zoom menu is how a student reaches
-  work drawn off-screen. And the parameter rides in a URL the participant can read, so this
-  withholds the pen board-side rather than enforcing anything. `allow_mod` is still the only real
-  permission in the app.
+  of them is a role, so the hook itself cannot tell a teacher from a student. The board can. It
+  honours `&drawOnWhiteboard=false` in its own URL, which refuses every stroke and hides the toolbar
+  and the style panel. Prebuilt documents that lever as `permissions.drawOnWhiteboard`; on the React
+  path it is undocumented, and `src/lib/boardSrc.ts` appends it for everyone but the teacher. Two
+  things come with it. Read-only takes pointer panning and ctrl-wheel zoom away, which is why the
+  bottom-left zoom menu matters. And a parameter in a URL is something the participant can read and
+  edit, so this withholds the pen at the board rather than enforcing anything. `allow_mod` remains
+  the only real permission in the app.
 - **A teacher can mute but cannot force-unmute.** `disableMic()` lands with no consent;
   `enableMic()` only fires `onMicRequested` on the target, who accepts or rejects. The button is
   named "Ask to unmute" for that reason.

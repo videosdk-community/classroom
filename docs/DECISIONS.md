@@ -582,3 +582,34 @@ is the fix, and is the only way to demo it live.
 `generateLink({ type: "email_change_new" })` is not a way around it: it answers
 `400 An email address is required`, because a guest has no current address for the change to be
 *from*.
+
+## Listing recordings: VideoSDK has no owner, so ownership is decided here
+
+`GET /v2/recordings` is account-wide. Every recording made under the API key is reachable by
+anything holding the secret, and a row carries `apiKey`, `roomId` and `sessionId` but nothing that
+says which of our teachers it belongs to. A shared account means an unfiltered list is other
+people's classes.
+
+So `api/recordings.ts` decides ownership before a single REST call goes out: it reads the caller's
+rooms from `public.rooms` under the service role, keyed on the verified session, and asks about
+those roomIds and no others. A roomId is never read from the request - same rule as
+`api/session.ts`. The fan-out is capped at the 25 most recent rooms; one `roomId` query costs about
+900ms and six run in parallel in roughly the same, so the cap is about a bounded blast radius, not
+about latency.
+
+Probed against the live API on 2026-08-22, because the REST reference documents none of this:
+
+- `GET /v2/recordings?roomId=` **filters correctly** and returns `{pageInfo, data}`. `roomIds=`,
+  `meetingId=` and v1's `?roomId=` are all silently **ignored** - they answer 200 with the whole
+  account. A filter that fails open is worse than one that errors, so the param spelling here is
+  load-bearing.
+- `sessionId=` also filters, on both v2 and v1 `/v1/meeting-recordings`.
+- A row exists from the moment recording **starts**, with no `file` on it. Key off `file.fileUrl`,
+  never off the row - that is why the handler drops fileless rows rather than showing a dead Play.
+- `file.accessMode` is `"public"` and `fileUrl` is a plain `https://cdn.videosdk.live/...mp4` that
+  answers 200 to an unauthenticated HEAD. No presigning, so `<video src>` is the whole player and
+  Download is an `<a download>`.
+- `file.meta.duration` is seconds, `file.size` is bytes.
+
+Nothing is mirrored into Postgres. A recordings table would need a webhook or a poller and would
+hold a second, staler copy of a list read a handful of times a day.

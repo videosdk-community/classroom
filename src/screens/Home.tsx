@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Avatar, Badge, Button, Input, Skeleton, Tooltip, cn } from '../design/ui'
+import { Alert, Avatar, Button, Input, Tooltip, cn } from '../design/ui'
 import { RoomIcon, type IconName } from '../components/icons'
+import { ClassList } from '../components/ClassList'
+import { RecordingList } from '../components/RecordingList'
+import { SectionHeader } from '../components/SectionHeader'
 import { useAuth } from '../auth/context'
 import { supabase } from '../lib/supabase'
-import { classLink, createRoom, listMyRooms, type Room } from '../lib/rooms'
+import { createRoom, listMyRooms, type Room } from '../lib/rooms'
+import { listMyRecordings, type Recording } from '../lib/recordings'
 import { readDisplayName, writeDisplayName } from '../lib/displayName'
 import type { ClassMode } from '../domain/classroom'
 import wordmark from '../assets/videosdk-wordmark-white.svg'
@@ -36,13 +40,13 @@ const MODE_OPTIONS: { label: string; value: ClassMode; description: string; icon
   { label: 'Lecture', value: 'lecture', description: 'Teacher onstage', icon: 'cam' },
 ]
 
-/* One state holds all three labels: the id while the copy landed, the id
-   behind a `failed:` prefix while it did not, and null the rest of the time. */
-function copyLabel(copied: string | null, roomId: string): string {
-  if (copied === roomId) return 'Copied'
-  if (copied === `failed:${roomId}`) return 'Copy failed'
-  return 'Copy link'
-}
+/* Home is a summary, not an archive: three of each, and everything else is
+   one click away on its own page.
+
+   Recordings are fetched one over the preview so "View all" can appear on
+   evidence rather than on a guess - the count VideoSDK reports is per room,
+   not per account, so there is no total to ask for. */
+const PREVIEW = 3
 
 function roomIdFromLink(raw: string): string {
   const trimmed = raw.trim()
@@ -58,6 +62,9 @@ export function Home() {
 
   const [rooms, setRooms] = useState<Room[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
+
+  const [recordings, setRecordings] = useState<Recording[] | null>(null)
+  const [recordingsError, setRecordingsError] = useState<string | null>(null)
 
   const [title, setTitle] = useState('')
   const [mode, setMode] = useState<ClassMode>('class')
@@ -80,7 +87,6 @@ export function Home() {
 
   const [joining, setJoining] = useState(false)
   const [link, setLink] = useState('')
-  const [copied, setCopied] = useState<string | null>(null)
 
   /* One field serves both modes, so the toggle has to move the caret into it
      itself - nothing unmounts and remounts to carry autoFocus. */
@@ -102,6 +108,20 @@ export function Home() {
     // oxlint-disable-next-line react/set-state-in-effect
     void refresh()
   }, [refresh])
+
+  /* Recordings are a separate fetch on purpose. They go through api/ and out
+     to VideoSDK, so they land after the class list does - and a slow or dead
+     recordings call must not keep the classes off the screen. */
+  useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
+    void listMyRecordings(PREVIEW + 1)
+      .then(setRecordings)
+      .catch((err: unknown) =>
+        setRecordingsError(
+          err instanceof Error ? err.message : 'Your recordings could not be loaded.',
+        ),
+      )
+  }, [])
 
   const create = async () => {
     setCreateError(null)
@@ -131,19 +151,6 @@ export function Home() {
       return
     }
     void create()
-  }
-
-  /* The clipboard write can be refused - a browser with the permission
-     denied, or the page served over plain http - and a button that silently
-     does nothing is worse than one that says so. */
-  const copy = async (roomId: string) => {
-    try {
-      await navigator.clipboard.writeText(classLink(roomId))
-      setCopied(roomId)
-    } catch {
-      setCopied(`failed:${roomId}`)
-    }
-    window.setTimeout(() => setCopied(null), 1600)
   }
 
   return (
@@ -358,105 +365,44 @@ export function Home() {
         )}
 
         <section className="mt-14 flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-semibold text-ink">Your classes</h2>
-            {rooms && rooms.length > 0 && (
-              <Badge tone="neutral" outline>
-                {rooms.length}
-              </Badge>
-            )}
-          </div>
+          <SectionHeader
+            title="Your classes"
+            count={rooms?.length}
+            action={
+              rooms &&
+              rooms.length > PREVIEW && (
+                <Button variant="text" onClick={() => navigate('/classes')}>
+                  View all
+                </Button>
+              )
+            }
+          />
+          <ClassList
+            rooms={rooms ? rooms.slice(0, PREVIEW) : null}
+            error={listError}
+            emptyText="Nothing yet. The class you start above will appear here."
+          />
+        </section>
 
-          {listError && <Alert tone="danger">{listError}</Alert>}
-
-          {/* Three placeholder rows rather than a spinner, so the list does not
-              jump when the real rows land. */}
-          {rooms === null && !listError && (
-            <ul className="flex flex-col">
-              {[0, 1, 2].map((i) => (
-                <li
-                  key={i}
-                  className="flex items-center gap-3 border-b border-hairline px-2 py-3.5 last:border-b-0"
-                >
-                  <Skeleton circle height={36} />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <Skeleton height={14} width="40%" />
-                    <Skeleton height={12} width="24%" />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {rooms?.length === 0 && (
-            <p className="border-t border-hairline pt-6 text-base text-ink-secondary">
-              Nothing yet. The class you start above will appear here.
-            </p>
-          )}
-
-          {rooms && rooms.length > 0 && (
-            <ul className="flex flex-col">
-              {rooms.map((room) => (
-                <li
-                  key={room.id}
-                  className={cn(
-                    'group flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-3',
-                    'border-b border-hairline last:border-b-0',
-                    'transition-colors duration-[120ms] ease-standard hover:bg-subtle',
-                    room.endedAt && 'opacity-60',
-                  )}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-inset text-ink-secondary">
-                    <RoomIcon name={room.mode === 'lecture' ? 'cam' : 'users'} size={18} />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-base font-medium text-ink">{room.title}</span>
-                    <span className="truncate font-mono text-sm text-ink-tertiary">
-                      {room.roomId}
-                    </span>
-                  </div>
-                  {/* Outline, not filled: the neutral fill is --bg-muted, which in
-                      dark resolves to the same value as --surface-card - a filled
-                      badge on this row would be an invisible rectangle. */}
-                  <span className="shrink-0">
-                    {room.endedAt ? (
-                      <Badge tone="neutral" outline>
-                        ended
-                      </Badge>
-                    ) : (
-                      <Badge tone={room.mode === 'lecture' ? 'primary' : 'neutral'} outline>
-                        {room.mode}
-                      </Badge>
-                    )}
-                  </span>
-                  {/* An ended room cannot be joined, so offering Open and a
-                      link that both dead-end is worse than offering neither.
-
-                      The pair is full width on a phone, so it drops to its own
-                      line and the title keeps the one above it rather than
-                      being truncated to three letters. */}
-                  {!room.endedAt && (
-                    <span className="flex shrink-0 items-center gap-1 max-sm:w-full max-sm:justify-end">
-                      <Button
-                        variant="text"
-                        /* Sized for the wider of its two labels: "Copied" is
-                           shorter than "Copy link", and without a floor the
-                           Open button slides left for the 1.6s it shows. */
-                        className="min-w-[5.5rem]"
-                        aria-live="polite"
-                        onClick={() => void copy(room.roomId)}
-                      >
-                        {copyLabel(copied, room.roomId)}
-                      </Button>
-                      <Button variant="secondary" onClick={() => navigate(`/c/${room.roomId}`)}>
-                        Open
-                      </Button>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+        <section className="mt-12 flex flex-col gap-3">
+          {/* No count here: the fetch is capped at four, so a badge would
+              say "4" for a teacher with forty. The full page counts. */}
+          <SectionHeader
+            title="Recordings"
+            action={
+              recordings &&
+              recordings.length > PREVIEW && (
+                <Button variant="text" onClick={() => navigate('/recordings')}>
+                  View all
+                </Button>
+              )
+            }
+          />
+          <RecordingList
+            recordings={recordings ? recordings.slice(0, PREVIEW) : null}
+            error={recordingsError}
+            emptyText="No recordings yet. A class you record appears here a minute or two after it ends."
+          />
         </section>
       </div>
     </div>

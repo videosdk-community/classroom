@@ -37,7 +37,11 @@ export function formatDuration(seconds: number | null): string {
 export function formatSize(bytes: number | null): string {
   if (bytes == null || !Number.isFinite(bytes)) return ''
   const mb = bytes / 1_000_000
-  return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`
+  if (mb >= 1000) return `${(mb / 1000).toFixed(1)} GB`
+  /* A two-second test recording is tens of kilobytes, and rounding that up
+     to "1 MB" is a lie the person can check. */
+  if (mb < 1) return `${Math.max(1, Math.round(bytes / 1000))} KB`
+  return `${Math.round(mb)} MB`
 }
 
 export function formatRecordedAt(iso: string | null): string {

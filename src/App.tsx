@@ -2,12 +2,16 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { SignIn } from './screens/SignIn'
 import { AuthCallback } from './screens/AuthCallback'
 import { Home } from './screens/Home'
+import { Classes } from './screens/Classes'
+import { Recordings } from './screens/Recordings'
 import { JoinRoute } from './screens/JoinRoute'
 import { RequireAuth } from './auth/RequireAuth'
 
 /* Routes.
 
    /                signed-in home: start a class, join one, reopen one
+   /classes         every class you own
+   /recordings      every recording of a class you own
    /signin          magic link request
    /auth/callback   where the link lands
    /c/:roomId       the one way into a class
@@ -23,6 +27,22 @@ export default function App() {
         element={
           <RequireAuth>
             <Home />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/classes"
+        element={
+          <RequireAuth>
+            <Classes />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/recordings"
+        element={
+          <RequireAuth>
+            <Recordings />
           </RequireAuth>
         }
       />

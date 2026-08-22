@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-/* Small HTTP plumbing, shared by both functions.
+/* Small HTTP plumbing, shared by the api/ functions.
 
    Every failure leaves here as one shape - { error: { code, message } } - so
    the browser can switch on a stable code and still have a sentence to show
@@ -9,12 +9,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 export class HttpError extends Error {
   status: number
   code: string
+  /** What to put in the Allow header when this is a 405. */
+  allow?: string
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, allow?: string) {
     super(message)
     this.name = 'HttpError'
     this.status = status
     this.code = code
+    this.allow = allow
   }
 }
 
@@ -38,8 +41,21 @@ export function readJson(req: VercelRequest): Record<string, unknown> {
 }
 
 export function requirePost(req: VercelRequest): void {
-  if (req.method !== 'POST') {
-    throw new HttpError(405, 'method_not_allowed', `${req.method ?? 'That method'} is not allowed here.`)
+  requireMethod(req, 'POST')
+}
+
+export function requireGet(req: VercelRequest): void {
+  requireMethod(req, 'GET')
+}
+
+function requireMethod(req: VercelRequest, method: 'GET' | 'POST'): void {
+  if (req.method !== method) {
+    throw new HttpError(
+      405,
+      'method_not_allowed',
+      `${req.method ?? 'That method'} is not allowed here.`,
+      method,
+    )
   }
 }
 
@@ -55,7 +71,7 @@ export function handle(fn: Handler): Handler {
       await fn(req, res)
     } catch (err) {
       if (err instanceof HttpError) {
-        if (err.status === 405) res.setHeader('Allow', 'POST')
+        if (err.status === 405) res.setHeader('Allow', err.allow ?? 'POST')
         json(res, err.status, { error: { code: err.code, message: err.message } })
         return
       }

@@ -52,10 +52,16 @@ Supabase project. **`VIDEOSDK_API_KEY`, `VIDEOSDK_SECRET` and the Supabase servi
 role key are server-only and must never carry a `VITE_` prefix** - anything
 `VITE_`-prefixed is inlined into the browser bundle at build time.
 
-In your Supabase project, add `http://localhost:3000/**` and your deployed
-domain to **Authentication - URL Configuration - Redirect URLs**, and set the
-Site URL to match. The built-in email sender is rate-limited to a few messages
-an hour, which is enough to sign in but not enough to iterate on.
+In your Supabase project, enable **Authentication - Providers - Anonymous
+sign-ins**. That is the default way in: a name and a button, no email. Raise the
+anonymous sign-in limit under **Authentication - Rate Limits** too - the default
+is 30 an hour per IP, and a class sharing one network shares one IP.
+
+Magic link stays as the way to get an account that outlives the browser, so also
+add `http://localhost:3000/**` and your deployed domain to **Authentication -
+URL Configuration - Redirect URLs**, and set the Site URL to match. The built-in
+email sender is rate-limited to a few messages an hour, which is enough to sign
+in but not enough to iterate on.
 
 ## Scripts
 

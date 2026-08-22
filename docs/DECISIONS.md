@@ -432,3 +432,46 @@ only in the requesting tab.
 and the **"+N" overflow chip**, which the live rail in `LiveClassroom` does not have - a rail is not
 a plan for forty students. That behaviour is recorded here rather than kept alive as dead code;
 port it when the live rail gets a cap.
+
+## Guests are real users, and that is why the security model did not move
+
+The way in is a name and a button. `signInAnonymously()` creates a row in `auth.users` with a real
+id and a real JWT carrying the `authenticated` role; the only thing a guest lacks is an identity to
+sign back in with once the browser storage is gone.
+
+That is what makes it safe here. `api/session.ts` reads exactly one fact - does `room.owner_id`
+equal the verified `user.id` - and a guest has a `user.id` like anyone else. So `requireUser`, the
+ownership comparison, the permission mint, `participantId`, and all three owner-scoped RLS policies
+work unchanged. **Not one line of `api/` changed to ship this.** Verified by posting
+`{"role":"teacher","permissions":["allow_mod"]}` alongside a guest's `roomId` and getting
+`ask_join` back.
+
+The alternative people reach for - dropping Supabase because "it is only a demo" - deletes the
+thing `owner_id` binds to. Role would then come from the client, and anyone could claim `allow_mod`.
+`allow_mod` is the only real enforcement in this app, so that is not a smaller version of the
+product, it is a different one.
+
+Magic link stays, behind a toggle, as the way to get an account that survives a cleared browser.
+
+**The name is collected on the sign-in screen** rather than on Precall, reversing the earlier note in
+`SignIn.tsx`. It is the only field on the screen, so asking costs nothing, and it rides in
+`user_metadata.display_name`. `suggestedName()` reads it there first, which is why a guest whose
+localStorage is wiped still comes back with their name. `user_metadata` is writable by the account
+it belongs to and must never decide anything - it is decoration, exactly like the `role` field in
+the session response.
+
+Three consequences worth knowing before editing this:
+
+- **Anonymous sign-in is rate-limited to 30 per hour per IP**, and it is raised in the dashboard, not
+  in code. A class of twenty on one venue network shares one IP. This is the trap that actually bites.
+- **Signing a guest out is one way.** `signOut()` does not delete the `auth.users` row, so their
+  classes survive as rows with an owner nobody can be again. Home says so in a `confirm` and calls
+  the button "Start over" rather than "Sign out".
+- **Guest accounts expire.** `public.delete_expired_guests()` runs nightly under `pg_cron` and
+  deletes guests older than 30 days; `rooms.owner_id` is `on delete cascade`, so their classes go
+  with them. Supabase has no automatic cleanup for anonymous users - without this the table grows
+  for as long as the demo is up.
+
+Advisor lint `0012_auth_allow_anonymous_sign_ins` reports at INFO once this is enabled, and is
+correct to leave. Every policy on `public.rooms` is already `(select auth.uid()) = owner_id`, there
+is no insert policy, and `insert` is revoked from `authenticated`.

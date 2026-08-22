@@ -230,7 +230,7 @@ export function Home() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[760px] flex-col px-6 pt-16 pb-16 sm:pt-24">
+      <div className="mx-auto flex w-full max-w-[760px] flex-col px-6 pt-8 pb-16 sm:pt-12">
         {/* The one authored entrance on this screen. The list rows below land
             without it, so the composer is the thing that arrives. */}
         <form className="vsdk-enter flex flex-col" onSubmit={submit}>
@@ -364,7 +364,7 @@ export function Home() {
           </div>
         )}
 
-        <section className="mt-14 flex flex-col gap-3">
+        <section className="mt-10 flex flex-col gap-3">
           <SectionHeader
             title="Your classes"
             count={rooms?.length}
@@ -384,7 +384,7 @@ export function Home() {
           />
         </section>
 
-        <section className="mt-12 flex flex-col gap-3">
+        <section className="mt-10 flex flex-col gap-3">
           {/* No count here: the fetch is capped at four, so a badge would
               say "4" for a teacher with forty. The full page counts. */}
           <SectionHeader

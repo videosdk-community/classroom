@@ -36,6 +36,14 @@ comment on function public.delete_expired_guests is
 
 -- Not executable by a browser under any role. The function exists to give
 -- cron one name to call, not to give the client a new capability.
+--
+-- PUBLIC is the grant that has to go. Postgres grants EXECUTE on a new
+-- function to PUBLIC by default, and revoking from anon and authenticated
+-- leaves that default in place - the function stays reachable at
+-- /rest/v1/rpc/delete_expired_guests with nothing but the publishable key,
+-- running as its definer. Revoke PUBLIC first; the named roles after it are
+-- belt and braces against a later grant.
+revoke execute on function public.delete_expired_guests() from public;
 revoke execute on function public.delete_expired_guests() from anon, authenticated;
 
 select cron.schedule(

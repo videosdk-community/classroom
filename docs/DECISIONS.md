@@ -377,14 +377,21 @@ verify.
 
 ## The display name is client-chosen, and is not identity
 
-Magic link gives an email and no name, so Precall asks for one, prefilled from the email's local
-part. The field sits **outside** every per-state block on that screen: the blocked and unavailable
-paths never render the granted block, so a name asked for only in there would be skipped by exactly
-the people who most need to be identifiable in the room.
+The name shows on every tile, in chat, in the teacher's knock queue and in the recording's name
+tags, and nothing in auth supplies one - a magic link gives an email, a guest gives nothing at all.
+
+Where it is asked for moved twice, and the shipped answer is **the sign-in screen**. It is the only
+field there, so asking costs nothing, and it rides in `user_metadata.display_name` so a guest keeps
+their name even after localStorage is cleared. `src/lib/displayName.ts` mirrors it to localStorage
+for a first paint that does not wait on the session, and `suggestedName()` falls back to the email's
+local part. Home lets you change it from the header, beside the avatar, writing through on every
+keystroke - it is account identity rather than part of starting a class, so it does not belong on the
+composer. Precall no longer collects it; it carries the chosen name through to the join.
 
 A student can therefore type any name they like. That is fine and it is worth being plain about:
-**the name is not a security boundary, the role is.** Step 7's knock queue shows the name, and it
-should not be mistaken for an identity.
+**the name is not a security boundary, the role is.** The knock queue shows the name, and it should
+not be mistaken for an identity. `user_metadata` is writable by the account it belongs to, which is
+the same reason the `role` field in the session response decides nothing.
 
 ## VideoSDK token payload details that are not cosmetic
 
@@ -453,12 +460,23 @@ verifier and the exchange fails. The test will need either `flowType: 'implicit'
 `storageState` - which is why `/auth/callback` is a real route that depends on nothing existing
 only in the requesting tab.
 
-## Where VideoRail went
+## The Class rail is capped at twelve, and the overflow opens the roster
 
-`src/components/VideoRail.tsx` was deleted with `/room`, its only importer. It carried the rail cap
-and the **"+N" overflow chip**, which the live rail in `LiveClassroom` does not have - a rail is not
-a plan for forty students. That behaviour is recorded here rather than kept alive as dead code;
-port it when the live rail gets a cap.
+`src/components/VideoRail.tsx` was deleted along with the fixture route `/room` and then rebuilt for
+the live path, which is why this section used to say the file was gone. It is back, and it carries
+the cap it was deleted with.
+
+Twelve tiles is roughly what fits across a laptop before a face stops being readable. Past that the
+rail shows a **"+N" chip that opens the People panel**, because a class of forty is legible as a list
+and not as a strip of thumbnails.
+
+The order is not join order. **Self and the teacher are pinned to the front**, so the two faces a
+student actually looks for - "am I muted" and "is the teacher still here" - cannot fall off the end
+of the cap.
+
+The rail exists in Class only. Lecture has no rail at all: the teacher's tile lives in the side
+column on `LectureStage`, with promoted students beside them and a small self tile underneath. One
+face stretched across a 112px full-width band is waste, and the height it costs comes off the board.
 
 ## Guests are real users, and that is why the security model did not move
 
@@ -613,3 +631,213 @@ Probed against the live API on 2026-08-22, because the REST reference documents 
 
 Nothing is mirrored into Postgres. A recordings table would need a webhook or a poller and would
 hold a second, staler copy of a list read a handful of times a day.
+
+---
+
+The sections below were settled while the app was being built rather than before it, which is why
+they arrived after the first pass of this document. Everything here is in the shipped code.
+
+## The teacher's exit ends the class for everyone
+
+The teacher's control says **End**, not Leave, and it calls `end()` rather than `leave()`.
+
+`leave()` drops the teacher and leaves the room open, so students sit in a class with no teacher and
+a board nobody owns. `end()` closes the room, and every student's `onMeetingLeft` carries the
+room-close code the gate already reads, so they land on a centred "Teacher left" screen instead of an
+error card. The end of a class is not a failure and does not get an error card.
+
+Exits caused by the room closing must **not** call `leave()` on the way out. The SDK has already
+dropped that participant, and calling it anyway throws `ERROR_ALREADY_IN_REQUESTED_STATE` across
+every student's console at the moment the class ends. `RoomGate` only calls `leave()` for the exits
+it decides itself: a denial, and the lobby's own buttons.
+
+## Removing a student is the only moderation action with no consent step
+
+`participant.remove()` hangs off the `Participant` object, the same as the mute calls. There is no
+prompt, no request and no acceptance: the student is dropped and finds out from the leave reason.
+
+Three server codes mean the same thing to them, and the app treats them as one - **1002** an SDK
+`remove()`, **1008** remove-all, **1010** the REST endpoint. Who did it is not the student's question
+to answer. The code arrives on the websocket close frame, so it is checked **before** the room-closed
+codes: being removed and the class ending both land as a disconnect, and the student is owed the one
+that is actually about them.
+
+**Nothing here bars a rejoin, and the copy does not pretend otherwise.** The link still works and the
+student comes back as a knock, which is why their exit screen still offers "Ask again".
+
+The roster action is icon-only and drawn in danger red. It never appears on a teacher's row: a room
+can hold more than one `allow_mod` holder and they do not get to eject each other. There is no
+confirmation dialog - the button is already icon-only and red, and a modal over a live class costs
+more than the mis-click it prevents - but a toast names who went, and the name is read **before** the
+call, because `onParticipantLeft` lands in the same beat and takes the roster row with it.
+
+Removing also drops the student from the promoted list. Raised hands narrow themselves against the
+roster; the promoted list does not, so without that line a removed student who knocks again walks
+straight back onto the Lecture stage.
+
+## The teacher's board opens itself, and the retry is not optional
+
+A class that opens on an empty board region reads as a product that has not loaded, so the teacher's
+board starts on arrival. The panel starts closed for the same reason: the board is the first thing a
+class should see.
+
+The retry is the whole reason this is a loop rather than one call. **A `startWhiteboard()` issued in
+the same beat as `onMeetingJoined` is accepted and then silently dropped** - no throw, no `onError`,
+no 4056, just a board that never opens. Driven in the browser rather than reasoned about: the
+one-shot version left the teacher looking at "The board is not open yet" while the same call from the
+control bar a second later worked every time.
+
+Five attempts, each awaiting the last, 1500ms apart. Awaiting serialises them so the in-flight flag is
+never contended and the server never sees the double-start that 4056 exists to reject. It stops the
+moment the board opens and **never fires again afterwards**, tracked in a ref rather than derived: a
+null url cannot tell "the teacher stopped the board" from "it has not started yet", and reopening a
+board the teacher deliberately closed reads as a broken control.
+
+## The recording composites SPOTLIGHT, and `startRecording`'s arguments are positional
+
+The config is `{ layout: { type: 'SPOTLIGHT', priority: 'PIN' }, theme: 'DARK', mode:
+'video-and-audio', quality: 'high', orientation: 'landscape' }`. SPOTLIGHT rather than GRID because
+this is a board-centric class: what is worth keeping is the board and whoever is talking over it, not
+forty tiled faces shrinking as the room fills. The board is ratio-locked to 16:9 partly for this - the
+cloud composites at 1280x720, so the shape on screen is the shape the class gets back.
+
+**`startRecording(webhookUrl, awsDirPath, config, transcription)` takes four positional arguments and
+all four are optional.** So `startRecording(RECORDING_CONFIG)` passes the config as the webhook URL
+and the recording runs with the default layout, silently, with no error anywhere. The two leading
+nulls are load-bearing. Do not tidy them away.
+
+The typings disagree with the runtime on three points at once: `meeting.d.ts` declares `webhookUrl`
+and `awsDirPath` as required `string`, requires `config.layout.gridSize`, and has no `orientation`
+field. One cast at that call site, the same treatment `onEntryResponded` gets, rather than loosening
+the config's own type.
+
+Start and stop are fire-and-forget. The truth about whether recording is running arrives on
+`onRecordingStateChanged`, so nothing awaits a promise whose value would be stale by the time a caller
+read it, and the toast fires on the **transition** rather than on the click - the teacher is told what
+the SDK actually did, and their message and every other participant's badge agree.
+
+## `StrictMode` is off, deliberately
+
+React double-invokes effects in development. `MeetingBridge`'s join is one of them, so with
+`StrictMode` on, one browser joins the meeting twice and appears in the room as two participants, each
+holding a live microphone. It presents as an SDK bug or as broken participant bookkeeping, and it is
+neither.
+
+A ref guard would suppress it and would also suppress a genuine double-mount, which is the class of
+bug `StrictMode` exists to reveal. The trade is made once, in `src/main.tsx`, rather than papered over
+at the join site. If you are putting it back: join a real room first and count the participants.
+
+## Audio is one element per remote participant, and not the SDK's `AudioPlayer`
+
+The SDK ships an `AudioPlayer` that gets the important parts right. `RemoteAudio` exists anyway for
+two reasons: `AudioPlayer` opens a **second** `useParticipant` subscription for someone the seam
+already bridges, doubling the per-participant listener count, and it reports autoplay rejections to
+`console.error`, where a silent room is indistinguishable from a broken one.
+
+The seam's version reads the track from the store's non-reactive registry, so it adds no
+subscriptions at all, and it catches the autoplay rejection with a named warning.
+
+**The local participant is skipped by the parent and muted on the element.** Belt and braces on
+purpose: the classic feedback howl is a live local mic played back through local speakers, and
+`muted` alone has been flipped by a well-meaning refactor before. Every `<video>` in the app is muted
+for the same reason - tiles, the precall preview and the screen stage all carry video only.
+
+## The class clock counts from mount, not from when the class started
+
+The SDK exposes no session start time, so there is nothing to anchor a shared clock to. The elapsed
+time in the top bar is seconds since **this participant** mounted, and a per-viewer clock that is
+honest about what it measures beats a shared one the app would have to invent.
+
+`useElapsedSeconds` reads the wall clock rather than counting ticks. An interval that fires sixty
+times is not sixty seconds - a backgrounded tab throttles timers to once a minute - and the lobby
+copy escalates off the same hook, so a student who switched away and came back would otherwise find
+it stuck in its first tier.
+
+**Nothing in this app navigates off a timer.** The clock ticks words and reveals buttons. A student
+about to be admitted at second 95 must not be ejected at 90.
+
+## Class mode has no top bar
+
+Lecture keeps the 56px header. Class drops it and moves the title, the mode chip, the recording badge
+and the clock into the control bar, flanking the controls absolutely so they stay centred on the
+window rather than on whatever is left after the title. That 56px goes back to the rail and the board.
+
+The recording badge is **never hidden at any width**, in either mode. A cold student named the absence
+of a recording indicator as the thing that would stop them unmuting, and the composite genuinely does
+capture the board, the ink and live cursors with name tags.
+
+## Board chrome is anchored inside the fitted rect, below a row the probe never saw
+
+The board is ratio-locked and centred, so on a short window the fitted rect is narrower than the
+region around it. Chrome anchored to the container hangs off the board's edge into the dark surround -
+visible at 1100x780, and it reads as a bug rather than as chrome. `BoardStage` takes an `overlay`
+prop and renders it **inside** the fitted rect instead.
+
+That layer is `pointer-events-none` and every interactive leaf opts back in. The board underneath is
+an iframe, and a full-bleed layer that still accepts pointer events eats every stroke before it
+reaches the canvas.
+
+Two collisions the real board exposed that the step-0 probe could not:
+
+- **The collaborator row.** tldraw stacks avatar chips in the top-right corner and grows them
+  leftwards as the class does. The probe drove a board with one participant on it, so the row never
+  appeared and it is missing from the measured keepout table. `COLLABORATORS_HEIGHT` is why the knock
+  stack starts 40px down.
+- **The page menu is a fixed 346px**, not a fraction of the board. App chrome that centres itself on
+  the board is narrower than the board at every size, so on a small board a centred pill lands on top
+  of the menu. Centre in what is left of the board, not in the board.
+
+Both are recorded in `src/lib/boardGeometry.ts` so the next overlay does not rediscover them.
+
+The teacher's floating stack is one column, top-right, and it belongs to whichever surface is on
+centre stage - it follows a screen share up. Knocks sit above hands: somebody waiting to be let in has
+nothing else on screen, while a raised hand is also in the rail and in the roster.
+
+## One toast, bottom centre, painted on an opaque surface
+
+The room had no way to say that something just happened. Mute-all did its work and rendered nothing.
+The toast primitive is small on purpose - one message at a time, newest wins, no queue and no
+positioning API - and its tones come from the same tokens `Alert` uses, so a toast and an inline alert
+of the same tone read as the same thing.
+
+**The position was measured rather than chosen.** Bottom centre at the reflex offset lands squarely on
+the hosted board's centred toolbar, covering the pen and the eraser for four seconds immediately after
+the teacher pressed a button. It sits 156px up instead, which clears the 64px control bar, the 24px
+stage padding and the board's own 56px toolbar pill.
+
+That puts the card over a white board, and the dark theme's 25%-alpha tone backgrounds blend toward
+white there and leave washed pastel behind light text. **The tone layer is painted over an opaque
+surface** so the colour is what the tokens intend on any backdrop, with a drop shadow to lift it off
+the board.
+
+## Home is one command line, not a stack of cards
+
+Starting a class and joining one are the same act from two sides, so they are one field with one
+submit and a toggle between them, rather than a heading with a composer and a link-styled row
+underneath.
+
+The heading says which one the line is about to make you - **teacher when you start, student when you
+join** - because the role is a consequence of owning the room and not a choice anyone gets to make
+here. The mode switcher leaves rather than sitting disabled while joining: joining a class that
+already exists cannot change its mode.
+
+The join field accepts a full link or a bare room id, because people paste both.
+
+Home is a summary and not an archive: three classes and three recordings, with `/classes` and
+`/recordings` behind a "View all" that only appears on evidence. Recordings are fetched one over the
+preview so that button can be decided on a count rather than on a guess - VideoSDK reports a count per
+room, not per account, so there is no total to ask for. They are also a **separate** fetch from the
+class list, because they go through `api/` and out to VideoSDK, and a slow or dead recordings call
+must not keep the classes off the screen.
+
+## Known gap: `rooms.ended_at` is never written
+
+The column exists, `api/session.ts` refuses a room that has it set with a 409 and the sentence "This
+class has ended", and `ClassRow` dims the row and drops Open and Copy link for one. **Nothing in the
+app ever sets it.** A teacher pressing End closes the VideoSDK room and navigates home; the row is
+untouched.
+
+The consequence is that an ended class still looks live on Home, and its link leads to a precall and a
+join that fails at the SDK rather than at the API. Closing it means `api/rooms.ts` gaining an update
+path called on end, or a webhook, and it has not been built. Written down rather than left for someone
+to find by reading the schema.

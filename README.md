@@ -41,9 +41,10 @@ mechanism. Render it in an iframe and a video call is a teaching surface.
 - **One board, the teacher's pen.** The teacher opens the board and draws on it. Every student
   watches the same strokes land in real time on a board they cannot draw on, and keeps the zoom
   menu, so nothing drawn off-screen is out of reach.
-- **Two class shapes.** Class puts everyone onstage with a video rail. Lecture puts the teacher
-  onstage and lists students below, with promote-to-stage. Mode is picked at creation and fixed for
-  the life of the room.
+- **Two class shapes.** Class puts everyone onstage with a video rail, capped at twelve tiles with
+  the overflow opening the roster. Lecture puts the teacher onstage in the side column and lists
+  students below, with promote-to-stage. Mode is picked at creation and fixed for the life of the
+  room.
 - **Server-derived roles.** A teacher holds `allow_join` + `allow_mod`, a student holds `ask_join`,
   and which one you get is decided from Supabase room ownership on the server.
 - **A real lobby.** Students hold a weaker token, so they do not join, they knock. The teacher gets
@@ -51,6 +52,11 @@ mechanism. Render it in an iframe and a video call is a teaching surface.
 - **Class controls.** Chat, raise hand, mute-all, ask-to-unmute, remove a student, and teacher
   toggles that disable chat or hand-raising for the room. Toggle state is persisted pubsub, so a
   student who joins late or reloads arrives in the state the teacher chose.
+- **An exit that means what it says.** The teacher's control is End, not Leave: it closes the room
+  for everyone and each student lands on "Teacher left" rather than on an error. A removed student
+  gets their own screen, and can ask to join again - nothing bars them.
+- **A back gesture cannot walk you out.** A trackpad swipe across the board is a history-back
+  gesture, so the app blocks scroll chaining outright and confirms every Back that gets through.
 - **Screen share** covers the board while it runs and gives the board back untouched when it stops.
 - **Cloud recording**, with an indicator every participant can see, plus a recordings list and an
   in-page player for the classes you own. The composite captures the board, including ink drawn
@@ -191,6 +197,11 @@ it instead of discovering it late. `docs/DECISIONS.md` carries the reasoning and
   app's choice and a bad one is the app's bug. Below 900x506 the toolbar wraps and eats the board
   from the bottom, which is why the shell takes width back from the side panel instead of shrinking
   the board past 800.
+- **A `startWhiteboard()` issued in the same beat as `onMeetingJoined` is silently dropped.** No
+  throw, no `onError`, no 4056 - just a board that never opens. The teacher's board auto-start
+  retries for that reason, and stops for good once the board has been open once.
+- **`startRecording`'s four arguments are positional and all optional.** Passing the config alone
+  sends it as the webhook URL, and the recording runs with the default layout and no error anywhere.
 - **Where the docs and the typings disagree, the shipped bundle wins.** `onEntryResponded` arrives
   as two positional arguments while the `.d.ts` declares one object. Pubsub message ids can be empty
   strings, which collide silently as React keys, so keys are synthesised at the seam. Whiteboard
@@ -208,7 +219,9 @@ it instead of discovering it late. `docs/DECISIONS.md` carries the reasoning and
 | `src/screens/` | Home, sign-in, precall, the live classroom, classes, recordings |
 | `src/components/` | Everything the classroom is made of, from the board stage to the knock queue |
 | `src/design/` | Vendored VideoSDK design tokens and primitives |
+| `src/lib/` | Supabase and API clients, board geometry, the read-only board URL, small hooks |
 | `supabase/migrations/` | The rooms table, its RLS, and the guest cleanup job |
+| `scripts/` | The bundle secret check, and two ways to sign a test account in without email |
 | `docs/DECISIONS.md` | Every settled decision, with what was probed and what it cost |
 
 ## Scripts
@@ -222,10 +235,12 @@ it instead of discovering it late. `docs/DECISIONS.md` carries the reasoning and
 | `node scripts/dev-session.mjs <email>` | Sign a test account in without waiting for an email |
 | `node scripts/link.mjs <email>` | A full redeemed session as JSON, for seeding a test browser |
 
-There are no unit tests, by decision. Verification is two real browsers plus one Playwright spec for
-the flows that matter. Cross-participant tests need Chromium's
-`--use-fake-device-for-media-stream` (`-stream`, not `-capture`, which Chrome ignores silently while
-driving your real webcam) and should assert the device really is fake before anything else.
+There are no tests in this repo, by decision. Verification is two real browsers driven by hand,
+which is how every finding in `docs/DECISIONS.md` was made. If you add an end-to-end spec, note that
+cross-participant tests need Chromium's `--use-fake-device-for-media-stream` (`-stream`, not
+`-capture`, which Chrome ignores silently while driving your real webcam) and should assert the
+device really is fake before anything else. `scripts/link.mjs` exists for exactly that: it prints a
+redeemed session as JSON, because the magic link cannot be driven under PKCE.
 
 ## Learn more
 

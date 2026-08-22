@@ -17,8 +17,7 @@
 
 ---
 
-Video, audio, chat, whiteboard, recording and the lobby all come from VideoSDK. No second real-time
-vendor appears anywhere in the app.
+Video, audio, chat, whiteboard, recording and the lobby all come from VideoSDK. No second real-time vendor appears anywhere in the app.
 
 ## The whiteboard
 
@@ -30,8 +29,7 @@ const { startWhiteboard, stopWhiteboard, whiteboardUrl } = useWhiteboard();
 {whiteboardUrl && <iframe src={whiteboardUrl} title="Whiteboard" />}
 ```
 
-`whiteboardUrl` flips from `null` to a URL for every participant at once. That is the whole sync
-mechanism. Render it in an iframe and a video call becomes a teaching surface.
+`whiteboardUrl` flips from `null` to a URL for every participant at once. That is the whole sync mechanism. Render it in an iframe and a video call becomes a teaching surface.
 
 ## Features
 
@@ -56,13 +54,11 @@ pnpm vercel login && pnpm vercel link
 pnpm dev:api            # http://localhost:3000
 ```
 
-Use `pnpm dev:api`. It runs `vercel dev`, which serves the app and the `api/` functions from one
-origin. `pnpm dev` is Vite alone with no `/api` at all, for UI work only.
+Use `pnpm dev:api`. It runs `vercel dev`, which serves the app and the `api/` functions from one origin. `pnpm dev` is Vite alone with no `/api` at all, for UI work only.
 
 ### Environment
 
-Key and secret from the [VideoSDK dashboard](https://app.videosdk.live), the rest from your Supabase
-project.
+Key and secret from the [VideoSDK dashboard](https://app.videosdk.live), the rest from your Supabase project.
 
 ```bash
 # Server-only. Never prefix these with VITE_.
@@ -75,65 +71,40 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-`VITE_`-prefixed values are inlined into the bundle. `pnpm build` runs
-`scripts/check-bundle-secrets.mjs` and fails if a server-only name or value reaches `dist/`.
+`VITE_`-prefixed values are inlined into the bundle. `pnpm build` runs `scripts/check-bundle-secrets.mjs` and fails if a server-only name or value reaches `dist/`.
 
 ### Supabase
 
 Run both files in `supabase/migrations/` oldest first. Then in the dashboard:
 
 1. **Authentication - Providers - Anonymous sign-ins**: on. This is the default way in.
-2. **Authentication - Rate Limits**: raise the anonymous limit. The default 30/hour per IP is one
-   classroom on one network.
-3. **Authentication - URL Configuration**: add `http://localhost:3000/**` and your deployed domain
-   to the redirect allowlist.
+2. **Authentication - Rate Limits**: raise the anonymous limit. The default 30/hour per IP is one classroom on one network.
+3. **Authentication - URL Configuration**: add `http://localhost:3000/**` and your deployed domain to the redirect allowlist.
 
-The built-in email sender is capped at a few messages an hour. `node scripts/dev-session.mjs <email>`
-signs a test account in without one.
+The built-in email sender is capped at a few messages an hour. `node scripts/dev-session.mjs <email>` signs a test account in without one.
 
 ### Deploy
 
-Import the repo on Vercel, set the same five variables, ship. `vercel.json` already routes `api/` to
-functions and everything else to the SPA. Add the deployed origin to the Supabase redirect allowlist.
+Import the repo on Vercel, set the same five variables, ship. `vercel.json` already routes `api/` to functions and everything else to the SPA. Add the deployed origin to the Supabase redirect allowlist.
 
 ## How it works
 
-**Roles come from the server.** `api/session.ts` verifies the Supabase session, compares the caller
-to `public.rooms.owner_id`, and mints `['allow_join','allow_mod']` or `['ask_join']` from that alone.
-Nothing role-shaped is ever read from the request body, the query string or the URL. Enforcement is
-the `permissions` array inside the signed token; the `role` field in the response only decides which
-buttons to draw.
+**Roles come from the server.** `api/session.ts` verifies the Supabase session, compares the caller to `public.rooms.owner_id`, and mints `['allow_join','allow_mod']` or `['ask_join']` from that alone. Nothing role-shaped is ever read from the request body, the query string or the URL. Enforcement is the `permissions` array inside the signed token; the `role` field in the response only decides which buttons to draw.
 
-**One directory imports the SDK.** `useMeeting`, `useParticipant`, `useWhiteboard` and `usePubSub`
-each open a subscription per call site, so calling them from feature code multiplies subscriptions.
-`src/sdk/` subscribes each once in a bridge that renders nothing and pushes into a store; feature
-hooks read it through `useSyncExternalStore`. An oxlint rule keeps every other directory out.
+**One directory imports the SDK.** `useMeeting`, `useParticipant`, `useWhiteboard` and `usePubSub` each open a subscription per call site, so calling them from feature code multiplies subscriptions. `src/sdk/` subscribes each once in a bridge that renders nothing and pushes into a store; feature hooks read it through `useSyncExternalStore`. An oxlint rule keeps every other directory out.
 
-**Class controls ride persisted pubsub.** Toggles and raised hands publish on persisted topics, so
-`onOldMessagesReceived` replays them to late joiners. Each message is a full snapshot rather than a
-delta, and only the server-derived teacher id counts as a sender. Each client honors the toggles;
-nothing server-side stops a crafted publish, and `allow_mod` is the only real enforcement.
+**Class controls ride persisted pubsub.** Toggles and raised hands publish on persisted topics, so `onOldMessagesReceived` replays them to late joiners. Each message is a full snapshot rather than a delta, and only the server-derived teacher id counts as a sender. Each client honors the toggles; nothing server-side stops a crafted publish, and `allow_mod` is the only real enforcement.
 
 ## SDK notes
 
-Platform behaviour worth knowing before you design around it. `docs/DECISIONS.md` has the reasoning
-and the probe evidence for each.
+Platform behaviour worth knowing before you design around it. `docs/DECISIONS.md` has the reasoning and the probe evidence for each.
 
-- **The pen is a URL parameter, not an SDK permission.** `useWhiteboard` has no role member. The
-  board honours `&drawOnWhiteboard=false` on its own URL, undocumented on the React path, and
-  `src/lib/boardSrc.ts` appends it for everyone but the teacher. It also costs pointer pan and
-  ctrl-wheel zoom, and a participant can read the URL, so it withholds the pen rather than enforcing.
-- **A teacher can mute but cannot force-unmute.** `enableMic()` fires `onMicRequested` on the target,
-  who accepts or rejects. The button says "Ask to unmute".
-- **A denied student does not disconnect.** The SDK holds them at `CONNECTING`, so the app calls
-  `leave()` itself.
-- **`startWhiteboard()` in the same beat as `onMeetingJoined` is dropped silently.** No throw, no
-  `onError`. The teacher's auto-start retries until the board opens.
-- **`startRecording`'s four arguments are positional.** Passing the config alone sends it as the
-  webhook URL and the layout defaults, with no error anywhere.
-- **Where the docs and the typings disagree, the shipped bundle wins.** `onEntryResponded` arrives as
-  two positional arguments, pubsub message ids can be empty strings, whiteboard error codes 4054-4056
-  have no exported symbol, and there is no host-left event at all.
+- **The pen is a URL parameter, not an SDK permission.** `useWhiteboard` has no role member. The board honours `&drawOnWhiteboard=false` on its own URL, undocumented on the React path, and `src/lib/boardSrc.ts` appends it for everyone but the teacher. It also costs pointer pan and ctrl-wheel zoom, and a participant can read the URL, so it withholds the pen rather than enforcing.
+- **A teacher can mute but cannot force-unmute.** `enableMic()` fires `onMicRequested` on the target, who accepts or rejects. The button says "Ask to unmute".
+- **A denied student does not disconnect.** The SDK holds them at `CONNECTING`, so the app calls `leave()` itself.
+- **`startWhiteboard()` in the same beat as `onMeetingJoined` is dropped silently.** No throw, no `onError`. The teacher's auto-start retries until the board opens.
+- **`startRecording`'s four arguments are positional.** Passing the config alone sends it as the webhook URL and the layout defaults, with no error anywhere.
+- **Where the docs and the typings disagree, the shipped bundle wins.** `onEntryResponded` arrives as two positional arguments, pubsub message ids can be empty strings, whiteboard error codes 4054-4056 have no exported symbol, and there is no host-left event at all.
 
 ## Project layout
 
@@ -160,8 +131,7 @@ and the probe evidence for each.
 | `node scripts/dev-session.mjs <email>` | Sign a test account in without email |
 | `node scripts/link.mjs <email>` | A redeemed session as JSON, for seeding a test browser |
 
-No tests, by decision. Verification is two real browsers driven by hand, which is how every finding
-in `docs/DECISIONS.md` was made.
+No tests, by decision. Verification is two real browsers driven by hand, which is how every finding in `docs/DECISIONS.md` was made.
 
 ## Learn more
 

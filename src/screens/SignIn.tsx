@@ -148,7 +148,7 @@ export function SignIn() {
     if (err) {
       if (isGuest && isTaken(err)) {
         setError(
-          'That address already has an account, so it cannot be added to this one. Nothing has changed here - your classes are still on this guest account, and you are still signed into it. To reach the other account, sign into it in a different browser; the classes you started here will stay behind.',
+          'That email already belongs to another account. Nothing changed here, and your classes are safe.',
         )
       } else if (isRateLimited(err)) {
         setError(
@@ -191,19 +191,18 @@ export function SignIn() {
           {/* Says what you are actually doing. Someone who arrived on a class
               link is joining a class, not signing up for a product. */}
           <h1 className="text-2xl font-semibold text-ink">
-            {isGuest ? 'Sign in' : next.startsWith('/c/') ? 'Join the class' : 'Get started'}
+            {isGuest ? 'Save your classes' : next.startsWith('/c/') ? 'Join the class' : 'Get started'}
           </h1>
 
           {state === 'sent' ? (
             <>
               <Alert tone="success" title="Check your email">
-                A link is on its way to <span className="text-ink">{email.trim()}</span>. Open it in
-                this browser - it only completes where it was requested.
+                We sent a link to <span className="text-ink">{email.trim()}</span>. Open it in this
+                browser to finish. It only works in the browser that asked for it.
               </Alert>
               {isGuest && (
                 <p className="text-sm text-ink-tertiary">
-                  Nothing has changed yet. Your classes are still here, and confirming the address
-                  keeps them on this same account.
+                  Nothing has changed yet. Your classes are still on this account either way.
                 </p>
               )}
             </>
@@ -211,8 +210,9 @@ export function SignIn() {
             <>
               {isGuest && (
                 <p className="text-base text-ink-secondary">
-                  You are signed in as a guest. Add an email and you keep this same account, and
-                  every class on it - the email is only a way back in.
+                  They only exist in this browser. Clear your browser data or switch to another
+                  device and you cannot get back to them. Add an email and you keep this same
+                  account, reachable anywhere.
                 </p>
               )}
 
@@ -240,7 +240,7 @@ export function SignIn() {
                   type="submit"
                   disabled={state === 'sending' || email.trim() === ''}
                 >
-                  {state === 'sending' ? 'Sending the link' : 'Email me a link'}
+                  {state === 'sending' ? 'Sending the link' : 'Send me a link'}
                 </Button>
               </form>
 

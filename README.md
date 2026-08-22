@@ -39,8 +39,8 @@ mechanism. Render it in an iframe and a video call is a teaching surface.
 ## What is in the app
 
 - **One board, the teacher's pen.** The teacher opens the board and draws on it. Every student
-  watches the same strokes land in real time on a board they cannot draw on, and keeps the zoom menu, so nothing drawn off-screen is out
-  of reach.
+  watches the same strokes land in real time on a board they cannot draw on, and keeps the zoom
+  menu, so nothing drawn off-screen is out of reach.
 - **Two class shapes.** Class puts everyone onstage with a video rail. Lecture puts the teacher
   onstage and lists students below, with promote-to-stage. Mode is picked at creation and fixed for
   the life of the room.

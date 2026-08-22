@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Avatar, Badge, Button, Input, Skeleton, Tooltip, cn } from '../design/ui'
 import { RoomIcon, type IconName } from '../components/icons'
+import { SaveAccount } from '../components/SaveAccount'
 import { useAuth } from '../auth/context'
 import { supabase } from '../lib/supabase'
 import { classLink, createRoom, listMyRooms, type Room } from '../lib/rooms'
@@ -70,7 +71,10 @@ export function Home() {
   /* A guest has no email to show, and signing one out is not the reversible
      thing the word implies: the auth.users row survives, so their classes
      survive too - as rows with an owner nobody can ever be again. Say so
-     before doing it, and call the button what it does. */
+     before doing it, and call the button what it does.
+
+     A guest who does not want that can attach an email instead and keep
+     everything - see <SaveAccount /> under the class list. */
   const isGuest = user?.is_anonymous === true
   const account = isGuest ? 'Guest account' : (user?.email ?? '')
 
@@ -362,6 +366,11 @@ export function Home() {
           </div>
 
           {listError && <Alert tone="danger">{listError}</Alert>}
+
+          {/* Only a guest has anything to lose here, and the offer sits beside
+              the list it protects rather than in the header. It disappears on
+              its own: confirming the address flips is_anonymous to false. */}
+          {isGuest && <SaveAccount />}
 
           {/* Three placeholder rows rather than a spinner, so the list does not
               jump when the real rows land. */}

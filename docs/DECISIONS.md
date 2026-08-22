@@ -549,10 +549,28 @@ they land, so the existing `status === 'signedIn'` redirect fired before the con
 The redirect URL carries `confirm=email`, and the screen waits for `is_anonymous === false`
 instead.
 
-**Not handled, deliberately:** linking to an address that already has an account. Supabase refuses
-outright and does not merge. Merging would mean rewriting `rooms.owner_id` across two users, which
-`rooms_update_own` cannot express - its `with check` is `auth.uid() = owner_id`, so nobody can hand
-a row to somebody else. That is a service-role endpoint, and it does not exist. The copy says so.
+**Linking an address that already has an account** - the forgot-I-signed-up-before case. Probed:
+
+```
+{ status: 422, code: 'email_exists',
+  message: 'A user with this email address has already been registered' }
+```
+
+A hard refusal, and a good one. It answers **before** the send, so it is never masked by the rate
+limit; no enumeration obfuscation, so there is no fake "check your email" to strand anyone; and it
+writes nothing - the guest is left byte-for-byte as it was, `is_anonymous` still true, `identities`
+still empty, every class still theirs. Match on `code`, not on the message, which is prose.
+
+Supabase does not merge the two, and neither do we. Merging would mean rewriting `rooms.owner_id`
+across two users, which `rooms_update_own` cannot express - its `with check` is
+`auth.uid() = owner_id`, so nobody can hand a row to somebody else. That is a service-role
+endpoint, and it does not exist.
+
+What saves this from being a trap is that **a guest cannot switch accounts from inside the app at
+all**. There is no sign-out for a guest, and `/signin` never calls `signInWithOtp` while one is
+signed in - only `updateUser`. So the failure mode is a person reading an error, not a person
+silently losing a class. Reaching the older account means another browser, and the guest classes
+stay where they are.
 
 **The built-in sender is what blocks this end to end, and it is two limits, not one.** It caps
 messages per hour for the whole project - `over_email_send_rate_limit`, HTTP 429, which the

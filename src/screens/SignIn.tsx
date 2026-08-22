@@ -49,20 +49,29 @@ function safeNext(raw: string | null): string {
   return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
 }
 
-/* Supabase reports both of these as messages rather than codes worth matching
-   on exactly, so match loosely and fall back to its own words.
+/* Both of these carry a stable `code`, which is what to match on - the
+   messages beside them are prose Supabase is free to reword. The string check
+   is only a fallback for an older gotrue that omits the code.
+
+   Probed, not assumed. Linking an address that already has an account answers
+   422 / email_exists BEFORE it tries to send, so the collision is never
+   masked by the rate limit:
+
+     { status: 422, code: 'email_exists',
+       message: 'A user with this email address has already been registered' }
 
    The rate limit is the one that shows up in practice: the built-in sender
    allows only a handful of messages an hour for the whole project, and "email
    rate limit exceeded" tells the person at the keyboard nothing they can act
    on. It is not their address that is wrong. */
-function isTaken(message: string): boolean {
-  const m = message.toLowerCase()
-  return m.includes('already been registered') || m.includes('already registered')
+function isTaken(err: { code?: string; message: string }): boolean {
+  if (err.code === 'email_exists' || err.code === 'user_already_exists') return true
+  return err.message.toLowerCase().includes('already been registered')
 }
 
-function isRateLimited(message: string): boolean {
-  return message.toLowerCase().includes('rate limit')
+function isRateLimited(err: { code?: string; message: string }): boolean {
+  if (err.code === 'over_email_send_rate_limit') return true
+  return err.message.toLowerCase().includes('rate limit')
 }
 
 export function SignIn() {
@@ -137,11 +146,11 @@ export function SignIn() {
         })
 
     if (err) {
-      if (isGuest && isTaken(err.message)) {
+      if (isGuest && isTaken(err)) {
         setError(
-          'That address already has an account. Sign into it in a new browser - but the classes you started as a guest will stay behind, because they belong to this account and not that one.',
+          'That address already has an account, so it cannot be added to this one. Nothing has changed here - your classes are still on this guest account, and you are still signed into it. To reach the other account, sign into it in a different browser; the classes you started here will stay behind.',
         )
-      } else if (isRateLimited(err.message)) {
+      } else if (isRateLimited(err)) {
         setError(
           'Too many sign-in emails have gone out from this project in the last hour. Nothing was changed - wait a little and try again.',
         )

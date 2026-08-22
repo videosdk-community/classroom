@@ -19,6 +19,18 @@ export class ApiError extends Error {
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'GET' })
+}
+
+async function request<T>(path: string, init: RequestInit & { headers?: Record<string, string> }): Promise<T> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) {
@@ -26,9 +38,8 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   }
 
   const res = await fetch(path, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
   })
 
   /* A non-JSON body here almost always means the SPA rewrite swallowed the

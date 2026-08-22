@@ -53,6 +53,33 @@ Interactive live streaming does not fix any of this. ILS controls who publishes
 media, not who draws, and whiteboard appears nowhere in its docs. This app is
 plain RTC.
 
+## Leaving the class is guarded, and the gesture is blocked outright
+
+A two-finger horizontal swipe on a trackpad is a Back gesture. The whiteboard is
+the one surface in this app people swipe across for minutes at a time, and the
+hosted board only consumes those wheel events while its toolbar is live - so a
+student in read-only mode overscrolled past it into the browser's own history
+navigation and left the class without touching anything.
+
+`overscroll-behavior-x: none` on `html, body, #root` is the fix: it stops the
+scroll chaining the gesture depends on. Nothing in this app scrolls sideways, so
+it costs nothing.
+
+`useExitGuard` covers what CSS cannot - a keyboard Back, a mouse thumb button, a
+reload, a closed tab. It parks a sentinel history entry and re-pushes it on
+`popstate`, so the room URL never changes and React Router never renders anything
+else; the class carries on behind the confirmation. `beforeunload` handles the
+unload cases, where the browser draws its own dialog and ignores any message we
+pass.
+
+`LeavePrompt` is shown only for a caught Back. The Leave button does not raise
+it - a confirmation on a deliberate click is friction, not safety.
+
+The trap has one cost, and it is deliberate: leaving replaces the sentinel rather
+than the room entry, so Back from the home screen returns to that room's precall
+instead of to whatever came before it. Precall is a screen the participant can
+safely see.
+
 ## Class controls are broadcast state, not enforcement
 
 "Chat disabled" and "hand-raise disabled" are published to a `CLASS_CONTROLS`

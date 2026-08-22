@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BoardStage } from '../components/BoardStage'
 import { HandsChip } from '../components/HandsChip'
 import { KnockCard } from '../components/KnockCard'
+import { LeavePrompt } from '../components/LeavePrompt'
 import { MediaRequestPrompt } from '../components/MediaRequestPrompt'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
+import { ScreenStage } from '../components/ScreenStage'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
 import { VideoRail } from '../components/VideoRail'
 import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
 import { useElapsedSeconds } from '../lib/useElapsedSeconds'
+import { useExitGuard } from '../lib/useExitGuard'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { useToast } from '../design/ui'
 import {
@@ -28,6 +31,7 @@ import {
   useParticipantIds,
   useParticipantView,
   useParticipantViews,
+  usePresenterId,
   useEntryQueue,
   useRoomActions,
   useTopic,
@@ -46,6 +50,16 @@ import {
 /* A stable empty array, so a student's SidePanel does not get a new [] every
    render and re-render the roster for nothing. */
 const EMPTY_QUEUE: readonly EntryRequest[] = []
+
+/* A browser capability, read once at module scope rather than per render.
+
+   getDisplayMedia is absent on mobile and tablet browsers entirely, which is
+   the SDK's own documented limit and not something an app can work around.
+   Read defensively because it is also absent on an insecure origin, where
+   mediaDevices itself is undefined. */
+const SCREEN_SHARE_SUPPORTED =
+  typeof navigator !== 'undefined' &&
+  typeof navigator.mediaDevices?.getDisplayMedia === 'function'
 
 /* m:ss under an hour, h:mm:ss over it. Seconds are padded and minutes are not,
    so a class that has been running four minutes reads "4:12" rather than
@@ -93,6 +107,11 @@ export function LiveClassroom({
      event has landed. */
   const teacherId = useTeacherId()
   const recording = useIsRecording()
+  /* Who is presenting, for everyone. Null until somebody shares, and null
+     again the moment they stop - including from the browser's own sharing
+     bar, which is the only place a share can be stopped from outside this
+     app. */
+  const presenterId = usePresenterId()
   const whiteboard = useWhiteboard()
   const actions = useRoomActions()
   const navigate = useNavigate()
@@ -103,6 +122,24 @@ export function LiveClassroom({
      the control bar carries the toggle. */
   const [panel, setPanel] = useState<PanelKind>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+
+  /* Asked only when a Back gesture is caught, never by the Leave button - that
+     one is deliberate enough already. */
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  useExitGuard(true, useCallback(() => setConfirmLeave(true), []))
+
+  /* The class IS the teacher, so their exit ends it for everyone. end() is the
+     only way to close the room - leave() would drop the teacher and leave
+     students in an empty class with a board nobody owns. Students learn about
+     it from the leave reason.
+
+     Replace rather than push, so Back does not return to a room this
+     participant has already left. */
+  const exit = useCallback(() => {
+    if (isTeacher) actions.end()
+    else actions.leave()
+    navigate('/', { replace: true })
+  }, [isTeacher, actions, navigate])
 
   /* Class state is not local state. Both toggles used to be useState here,
      which meant a teacher turning chat off changed nothing on any other
@@ -205,6 +242,20 @@ export function LiveClassroom({
      own request come back. */
   const mediaRequest = useMediaRequest()
 
+  /* One stack, top-right, and it belongs to whichever surface is on centre
+     stage. Knocks first: somebody waiting to be let in has nothing else on
+     screen, while a raised hand is also in the rail and in the roster. */
+  const teacherOverlay = (
+    <div className="flex flex-col items-end gap-2">
+      <KnockCard
+        waiting={waiting}
+        onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+        onSeeAll={() => setPanel('people')}
+      />
+      <HandsChip count={raisedHands.size} onSeeAll={() => setPanel('people')} />
+    </div>
+  )
+
   return (
     <div className="relative flex h-full flex-col bg-canvas">
       {/* Lecture keeps the header. In Class it moves into the control bar,
@@ -225,26 +276,40 @@ export function LiveClassroom({
           )}
 
           <div className="min-h-0 flex-1 p-6">
-            <BoardStage
-              url={whiteboard.url}
-              canDraw={isTeacher}
-              overlay={
-                isTeacher ? (
-                  /* One stack, top-right. Knocks first: somebody waiting to
-                     be let in has nothing else on screen, while a raised hand
-                     is also in the rail and in the roster. */
-                  <div className="flex flex-col items-end gap-2">
-                    <KnockCard
-                      waiting={waiting}
-                      onRespond={(id, allow) => void actions.respondEntry(id, allow)}
-                      onSeeAll={() => setPanel('people')}
-                    />
-                    <HandsChip count={raisedHands.size} onSeeAll={() => setPanel('people')} />
-                  </div>
-                ) : undefined
-              }
-            />
+            {/* The board and the share share one region, and the share COVERS
+                rather than replaces. Unmounting BoardStage would unmount the
+                whiteboard iframe, and an iframe that remounts reloads - the
+                class would watch the board blank and redraw itself every time
+                a share ended. */}
+            <div className="relative h-full w-full">
+              <BoardStage
+                url={whiteboard.url}
+                canDraw={isTeacher}
+                overlay={isTeacher && !presenterId ? teacherOverlay : undefined}
+              />
+
+              {presenterId && (
+                <ScreenStage
+                  presenterId={presenterId}
+                  presenterName={views.find((p) => p.id === presenterId)?.name ?? 'Someone'}
+                  isSelf={presenterId === localId}
+                  onStop={() => void actions.toggleScreenShare()}
+                  /* The knock stack follows the share up, because a student
+                     waiting to be let in has no other surface and a teacher
+                     mid-demo is looking here. */
+                  overlay={isTeacher ? teacherOverlay : undefined}
+                />
+              )}
+            </div>
           </div>
+
+          {confirmLeave && (
+            <LeavePrompt
+              isTeacher={isTeacher}
+              onStay={() => setConfirmLeave(false)}
+              onLeave={exit}
+            />
+          )}
 
           {mediaRequest && (
             <MediaRequestPrompt
@@ -273,6 +338,17 @@ export function LiveClassroom({
               if (whiteboard.url) void actions.stopWhiteboard()
               else void actions.startWhiteboard()
             }}
+            sharingScreen={presenterId !== null && presenterId === localId}
+            /* Named for the person, not the id, because that is what the
+               control's tooltip says. Null when nobody else is presenting,
+               which is the only state that leaves the button enabled. */
+            shareTakenBy={
+              presenterId && presenterId !== localId
+                ? (views.find((p) => p.id === presenterId)?.name ?? 'Someone')
+                : null
+            }
+            shareSupported={SCREEN_SHARE_SUPPORTED}
+            onToggleShare={() => void actions.toggleScreenShare()}
             isRecording={recording}
             onToggleRecording={() => {
               if (recording) actions.stopRecording()
@@ -296,17 +372,7 @@ export function LiveClassroom({
             waitingCount={waiting.length}
             moreOpen={moreOpen}
             onSetMoreOpen={setMoreOpen}
-            onLeave={() => {
-              /* The class IS the teacher, so their exit ends it for everyone.
-                 end() is the only way to close the room - leave() would drop
-                 the teacher and leave students in an empty class with a board
-                 nobody owns. Students learn about it from the leave reason. */
-              if (isTeacher) actions.end()
-              else actions.leave()
-              /* Replace rather than push, so Back does not return to a room
-                 this participant has already left. */
-              navigate('/', { replace: true })
-            }}
+            onLeave={exit}
           />
         </main>
 
@@ -327,6 +393,26 @@ export function LiveClassroom({
             onMute={actions.muteParticipant}
             onAskToUnmute={actions.askToUnmute}
             onLowerHand={(id) => void actions.publish(HANDS_TOPIC, encodeHand(id, false))}
+            /* No confirm step, and a toast instead - the row's own button is
+               already icon-only and red, and a modal over a live class costs
+               more than the mis-click it prevents. The toast names who went,
+               because the row they were on is gone by the time it appears.
+
+               The name is read BEFORE the call. onParticipantLeft lands within
+               the same beat and takes the roster row with it, so looking the
+               name up afterwards finds nothing and the toast reads "Removed
+               ." */
+            onRemove={(id) => {
+              const name = views.find((p) => p.id === id)?.name ?? 'That student'
+              actions.removeFromClass(id)
+              /* Raised hands narrow themselves against the roster, but the
+                 promoted list does not - so without this a removed student
+                 who knocks again walks straight back onto the Lecture stage. */
+              if (controls.promoted.includes(id)) {
+                setControls({ promoted: controls.promoted.filter((p) => p !== id) })
+              }
+              toast(`Removed ${name} from the class`, 'danger')
+            }}
             promoted={controls.promoted}
             onPromote={(id) => {
               setControls({ promoted: [...controls.promoted, id] })

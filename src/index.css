@@ -120,6 +120,13 @@
   body,
   #root {
     height: 100%;
+    /* Kills the trackpad's two-finger swipe-back. The gesture is a horizontal
+       overscroll of whatever is under the cursor, and it chains up to the
+       viewport unless something stops it - so a swipe across the whiteboard
+       used to walk the class out of the room. Nothing in this app scrolls
+       sideways, so there is nothing to lose. useExitGuard covers the ways
+       Back can still happen. */
+    overscroll-behavior-x: none;
   }
 
   body {

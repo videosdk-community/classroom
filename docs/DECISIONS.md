@@ -502,3 +502,47 @@ Three consequences worth knowing before editing this:
 Advisor lint `0012_auth_allow_anonymous_sign_ins` reports at INFO once this is enabled, and is
 correct to leave. Every policy on `public.rooms` is already `(select auth.uid()) = owner_id`, there
 is no insert policy, and `insert` is revoked from `authenticated`.
+
+## A guest can keep everything by adding an email
+
+`updateUser({ email })` on the signed-in guest links an email identity to the account that
+already exists. **The user id does not change.** That is the whole reason this works: `owner_id`
+on every one of their rooms already points at that id, so the classes come along with no
+migration, no reassignment and nothing for `api/session.ts` to notice. `is_anonymous` flips to
+false once the address is confirmed, and the UI follows - the prompt disappears and "Start over"
+becomes "Sign out".
+
+Probed rather than assumed, on a live guest that owned a class:
+
+```
+BEFORE is_anonymous: true   identities: []
+AFTER  is_anonymous: false  identities: ['email']   SAME USER ID: true
+```
+and the room row was still there, same `room_id`, now owned by a permanent account with the
+display name intact.
+
+Requires **Manual Linking** enabled on the project (`GOTRUE_SECURITY_MANUAL_LINKING_ENABLED`).
+It is separate from the anonymous provider toggle, and there is no capability to feature-detect -
+the refusal is the only sign it is off.
+
+**The stale-claim trap.** `is_anonymous` is a claim inside the access token, not something read
+live. An account upgraded out of band keeps showing the guest UI until the token is refreshed,
+because the stored JWT still says `true`. The real flow does not hit this: confirming the address
+returns a fresh session through the redirect. Anything that changes an account server-side does,
+and the fix is `refreshSession()`, not a reload.
+
+`/auth/callback` needed one change for this. A guest confirming an address is **already signed
+in** when they land, so the existing `status === 'signedIn'` redirect fired before the
+confirmation applied. The redirect URL now carries `confirm=email`, and the screen waits for
+`is_anonymous === false` instead.
+
+**Not handled, deliberately:** linking to an address that already has an account. Supabase refuses
+outright and does not merge. Merging would mean rewriting `rooms.owner_id` across two users, which
+`rooms_update_own` cannot express - its `with check` is `auth.uid() = owner_id`, so nobody can hand
+a row to somebody else. That is a service-role endpoint, and it does not exist. The copy says so.
+
+**The sender quota is the thing that breaks a demo.** This path sends through the same built-in
+Supabase sender as the magic link, capped at a few messages an hour for the whole project. It is
+what "email rate limit exceeded" means, and that message tells nobody anything actionable, so it
+is mapped to copy that says nothing was changed and to try again shortly. A real SMTP provider is
+the fix if this is ever demoed live.

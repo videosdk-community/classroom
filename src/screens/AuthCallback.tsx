@@ -2,7 +2,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Spinner } from '../design/ui'
 import { useAuth } from '../auth/context'
 
-/* Where the magic link lands.
+/* Where the magic link lands, and where a guest's email confirmation lands.
 
    The client is configured with detectSessionInUrl, so by the time this
    renders supabase-js is already exchanging the code in the URL for a
@@ -19,9 +19,17 @@ function safeNext(raw: string | null): string {
 }
 
 export function AuthCallback() {
-  const { status } = useAuth()
+  const { status, user } = useAuth()
   const [params] = useSearchParams()
   const next = safeNext(params.get('next'))
+
+  /* A guest confirming an email address is ALREADY signed in when they land
+     here, so `signedIn` is true from the first render and the redirect below
+     would fire before the confirmation is applied. `confirm=email` says to
+     wait for the thing that actually changed instead: is_anonymous going
+     false. SaveAccount is what puts the marker on the redirect URL. */
+  const confirmingEmail = params.get('confirm') === 'email'
+  const settled = confirmingEmail ? user?.is_anonymous === false : status === 'signedIn'
 
   /* Supabase reports a failed exchange in the URL rather than by throwing. */
   const failure = params.get('error_description') ?? params.get('error')
@@ -41,14 +49,16 @@ export function AuthCallback() {
     )
   }
 
-  if (status === 'signedIn') return <Navigate to={next} replace />
+  if (settled) return <Navigate to={next} replace />
 
-  /* 'signedOut' here means the exchange has not finished yet, not that it
-     failed - the failure path above is the one that reports a real problem. */
+  /* Not settled yet means the exchange has not finished, not that it failed -
+     the failure path above is the one that reports a real problem. */
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas">
       <Spinner />
-      <span className="text-base text-ink-secondary">Signing you in</span>
+      <span className="text-base text-ink-secondary">
+        {confirmingEmail ? 'Confirming your email' : 'Signing you in'}
+      </span>
     </div>
   )
 }

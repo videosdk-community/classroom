@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Alert, Avatar, Button, Input, Tooltip, cn } from '../design/ui'
 import { RoomIcon, type IconName } from '../components/icons'
 import { ClassList } from '../components/ClassList'
@@ -92,14 +92,33 @@ export function Home() {
      itself - nothing unmounts and remounts to carry autoFocus. */
   const fieldRef = useRef<HTMLInputElement>(null)
 
+  /* Which class the teacher just ended, handed over by the room's own exit.
+
+     The row is marked ended in Postgres on the way out, but that write is not
+     awaited - waiting was measured losing to this screen's own fetch while the
+     meeting tore down, which put the teacher back on their ended class with
+     Open and a copyable link on it. The person who just pressed End is
+     first-hand evidence, so the row reads ended from the first paint and the
+     fetch below agrees a moment later. */
+  const endedHere = (useLocation().state as { endedRoomId?: string } | null)?.endedRoomId
+
   const refresh = useCallback(async () => {
     try {
-      setRooms(await listMyRooms())
+      const mine = await listMyRooms()
+      setRooms(
+        endedHere
+          ? mine.map((room) =>
+              room.roomId === endedHere && !room.endedAt
+                ? { ...room, endedAt: new Date().toISOString() }
+                : room,
+            )
+          : mine,
+      )
       setListError(null)
     } catch (err) {
       setListError(err instanceof Error ? err.message : 'Your classes could not be loaded.')
     }
-  }, [])
+  }, [endedHere])
 
   /* Fetching the list on mount is what an effect is for. The lint rule cannot
      see that every setState in `refresh` happens after an await, so it reads

@@ -830,14 +830,35 @@ room, not per account, so there is no total to ask for. They are also a **separa
 class list, because they go through `api/` and out to VideoSDK, and a slow or dead recordings call
 must not keep the classes off the screen.
 
-## Known gap: `rooms.ended_at` is never written
+## `rooms.ended_at` is written by the teacher's own client, and Home is told separately
 
-The column exists, `api/session.ts` refuses a room that has it set with a 409 and the sentence "This
-class has ended", and `ClassRow` dims the row and drops Open and Copy link for one. **Nothing in the
-app ever sets it.** A teacher pressing End closes the VideoSDK room and navigates home; the row is
-untouched.
+For a while this column was read in two places and written in none. `api/session.ts` refused a room
+that had it set, `ClassRow` dimmed such a row and dropped Open and Copy link, and nothing ever set it -
+so an ended class still looked live on Home and its link dead-ended at the SDK rather than at a
+sentence. `endRoom()` in `src/lib/rooms.ts` closes that.
 
-The consequence is that an ended class still looks live on Home, and its link leads to a precall and a
-join that fails at the SDK rather than at the API. Closing it means `api/rooms.ts` gaining an update
-path called on end, or a webhook, and it has not been built. Written down rather than left for someone
-to find by reading the schema.
+**It goes straight to Supabase under RLS, with no endpoint.** `rooms_update_own` already says only the
+owner may write the row and its `with check` repeats the predicate, so a student running the same
+update matches zero rows rather than being refused. There is nothing here the service role would
+decide differently, and this is the same reasoning that puts `listMyRooms` on the browser client.
+`is('ended_at', null)` keeps the first ending, so reopening a link and ending again does not move the
+timestamp.
+
+**The write is not awaited, and that was measured rather than assumed.** The first version awaited it
+before navigating, on the grounds that Home starts fetching its list immediately and the two would
+race. Driven in a browser: the round trip outlived a 1500ms grace period while the meeting was tearing
+down, and the teacher still landed on their own ended class with Open and a copyable link on it. Any
+timeout long enough to win that race is long enough to hold someone inside a room that has already
+closed.
+
+So the navigation carries `state: { endedRoomId }` and Home marks that one row ended on its first
+paint. The teacher who just pressed End is first-hand evidence; the fetch agrees a moment later.
+Verified end to end: End returns to Home in **39ms**, the row reads "ended" with no Open or Copy link,
+a fresh document loading `/classes` shows the same from Postgres alone, and reopening the class link
+answers **409** with "This class has ended".
+
+Two honest edges. A failed write leaves the row saying live, logged and not surfaced - the class has
+ended either way, and the next end corrects it. And a teacher who closes the tab rather than pressing
+End never runs this at all; the VideoSDK room still closes when the last participant leaves, but the
+row stays live. Marking that would need a webhook, and the button is the path the product actually
+teaches.

@@ -157,6 +157,7 @@ function PrecallThenRoom({
       <RoomGate
         mode={fresh.mode}
         title={fresh.title}
+        roomId={fresh.meetingId}
         name={joined.name}
         participantId={fresh.participantId}
         isTeacher={fresh.role === 'teacher'}

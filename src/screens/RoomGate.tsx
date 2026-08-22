@@ -27,6 +27,9 @@ export type ExitReason = 'declined' | 'left' | 'ended' | 'evicted' | 'removed' |
 export interface RoomGateProps {
   mode: ClassMode
   title: string
+  /** The room id, carried through to the teacher's exit, which marks the row
+      ended. Server-vouched, from the session response. */
+  roomId: string
   name: string
   /** From the session response. See the comment on the denial effect - this
       is emphatically NOT the store's localId. */
@@ -38,6 +41,7 @@ export interface RoomGateProps {
 export function RoomGate({
   mode,
   title,
+  roomId,
   name,
   participantId,
   isTeacher,
@@ -127,7 +131,7 @@ export function RoomGate({
        consume a context it renders. */
     return (
       <ToastProvider>
-        <LiveClassroom mode={mode} title={title} isTeacher={isTeacher} />
+        <LiveClassroom mode={mode} title={title} roomId={roomId} isTeacher={isTeacher} />
       </ToastProvider>
     )
   }

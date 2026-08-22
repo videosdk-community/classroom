@@ -12,6 +12,7 @@ import { TopBar } from '../components/TopBar'
 import { VideoRail } from '../components/VideoRail'
 import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
+import { endRoom } from '../lib/rooms'
 import { useElapsedSeconds } from '../lib/useElapsedSeconds'
 import { useExitGuard } from '../lib/useExitGuard'
 import { useMediaQuery } from '../lib/useMediaQuery'
@@ -89,10 +90,15 @@ function toPerson(p: ParticipantView, raised: ReadonlySet<string>, onstage: bool
 export function LiveClassroom({
   mode,
   title,
+  roomId,
   isTeacher,
 }: {
   mode: ClassMode
   title: string
+  /* The row to mark ended when the teacher ends the class. From the session
+     response, not from the URL - the same value, but one of them is the one
+     the server already vouched for. */
+  roomId: string
   /* Server-derived, from room ownership, and passed down rather than read off
      the local participant row. The store's row does carry it, but only once a
      local participant exists - which is never true for anyone still knocking,
@@ -133,13 +139,36 @@ export function LiveClassroom({
      students in an empty class with a board nobody owns. Students learn about
      it from the leave reason.
 
+     end() closes the room at VideoSDK and nothing else. The row on our side is
+     what Home reads and what api/session.ts refuses a join against, so it is
+     written here too - otherwise an ended class keeps offering Open and a link
+     that dead-ends at the SDK instead of at a sentence.
+
+     The write is NOT awaited, and Home is told which class just ended instead.
+     Waiting was tried first and measured: the round trip outlived a 1500ms
+     grace period while the meeting was tearing down, so the teacher still
+     landed on their own ended class showing Open and a copyable link. Any
+     timeout long enough to win that race is long enough to hold someone inside
+     a room that has already closed.
+
+     So the navigation carries `endedRoomId`. Home renders that row ended from
+     the moment it paints, because the teacher who just pressed this button is
+     first-hand evidence, and the fetch that follows catches up on its own.
+
      Replace rather than push, so Back does not return to a room this
      participant has already left. */
   const exit = useCallback(() => {
-    if (isTeacher) actions.end()
-    else actions.leave()
-    navigate('/', { replace: true })
-  }, [isTeacher, actions, navigate])
+    if (!isTeacher) {
+      actions.leave()
+      navigate('/', { replace: true })
+      return
+    }
+    actions.end()
+    void endRoom(roomId).catch((err: unknown) =>
+      console.warn('[classroom] could not mark the class ended', err),
+    )
+    navigate('/', { replace: true, state: { endedRoomId: roomId } })
+  }, [isTeacher, roomId, actions, navigate])
 
   /* Class state is not local state. Both toggles used to be useState here,
      which meant a teacher turning chat off changed nothing on any other

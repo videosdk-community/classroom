@@ -44,6 +44,31 @@ export async function listMyRooms(): Promise<Room[]> {
   }))
 }
 
+/* Marks a class ended, at the moment its teacher ends it.
+
+   Straight to Supabase under RLS, like listMyRooms and for the same reason:
+   `rooms_update_own` already says only the owner may write the row, and its
+   `with check` is the same predicate, so a student running this against
+   somebody else's class matches zero rows rather than being refused. There is
+   nothing here the service role would decide differently, so there is no
+   endpoint.
+
+   `is('ended_at', null)` keeps the first ending. A teacher who ends a class,
+   reopens the link and ends it again should not have the timestamp move to the
+   second visit - the class ended when it ended.
+
+   This is what `api/session.ts`'s 409 and the "ended" badge on Home have always
+   read. Until this existed they read a column nothing wrote. */
+export async function endRoom(roomId: string): Promise<void> {
+  const { error } = await supabase
+    .from('rooms')
+    .update({ ended_at: new Date().toISOString() })
+    .eq('room_id', roomId)
+    .is('ended_at', null)
+
+  if (error) throw new Error(error.message)
+}
+
 /** The link a student pastes. Same shape everywhere, so it is built once. */
 export function classLink(roomId: string): string {
   return `${window.location.origin}/c/${roomId}`

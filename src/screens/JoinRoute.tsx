@@ -50,8 +50,10 @@ export function JoinRoute() {
             {/* The server's sentence IS the title in the ended case, so
                 repeating it verbatim underneath reads as a bug. Say the next
                 useful thing instead. */}
+            {/* The same link works again once the teacher restarts the class,
+                so this asks for the class rather than for a new link. */}
             {ended
-              ? 'The teacher closed it. Ask for a new link if it is running again.'
+              ? 'The teacher closed it. This link still works, so try it again once they start the class.'
               : (error?.message ?? 'Something went wrong.')}
           </Alert>
           <div className="flex gap-2">
@@ -194,7 +196,7 @@ const EXIT_COPY: Record<
   ended: {
     tone: 'info',
     title: 'Teacher left',
-    body: 'The class ended when they left. Ask for a new link if it runs again.',
+    body: 'The class ended when they left. This link keeps working, so open it again when they restart.',
     canAskAgain: false,
   },
   /* The second-tab collision. participantId is the Supabase user id, so one

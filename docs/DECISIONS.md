@@ -862,3 +862,22 @@ ended either way, and the next end corrects it. And a teacher who closes the tab
 End never runs this at all; the VideoSDK room still closes when the last participant leaves, but the
 row stays live. Marking that would need a webhook, and the button is the path the product actually
 teaches.
+
+**Ended is not terminal, and the teacher's next join is the restart.** The first version of this made
+it terminal, and that was wrong in a way only visible from the dashboard: pressing End burned the
+class link, so "Your classes" quietly became a history list and teaching the same class next week
+meant a new room and a new link for everyone. A VideoSDK `roomId` outlives the session held in it, so
+"ended" is a fact about the last class rather than about the room.
+
+`api/session.ts` therefore clears `ended_at` when the **owner** asks for a token on an ended room, and
+still answers students 409 until then. Ownership decides it, on the same comparison that mints the
+permissions, and nothing in the request is consulted. It is done there rather than through a second
+endpoint because the teacher opening the class already is the restart - a separate "reopen" call is
+one more thing to forget, and forgetting it would strand the room in a state only the database knows
+about. The row's action reads **Start again** instead of Open, and Copy link is withheld while the
+class is ended, because that link is a 409 for everyone the teacher would send it to.
+
+Driven end to end: End leaves the row "ended | Start again"; a student on the same link gets "This
+class has ended"; Start again puts the teacher back in the same `roomId`; the student's original link
+then reaches precall; and a fresh document reading `/classes` shows the row live again with Copy link
+and Open back. The student-facing copy says the link keeps working rather than asking for a new one.

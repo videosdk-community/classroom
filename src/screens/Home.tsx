@@ -56,6 +56,28 @@ function roomIdFromLink(raw: string): string {
   return match ? match[1] : trimmed
 }
 
+/* The "I just ended this one" hint, read once and then forgotten.
+
+   It rides on the navigation from the room, and a history entry keeps its
+   state for as long as the entry exists - so without this the row would still
+   read ended after the teacher restarted the class and navigated back to this
+   same entry. React Router keeps its state under `history.state.usr`, so
+   clearing that key drops the hint without touching the entry itself, and
+   doing it in an effect rather than during render keeps it out of the render
+   phase React is free to replay. */
+function useEndedHint(): string | undefined {
+  const state = useLocation().state as { endedRoomId?: string } | null
+  const [hint] = useState(state?.endedRoomId)
+
+  useEffect(() => {
+    if (!hint) return
+    const entry = (window.history.state ?? {}) as Record<string, unknown>
+    window.history.replaceState({ ...entry, usr: null }, '')
+  }, [hint])
+
+  return hint
+}
+
 export function Home() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -100,7 +122,7 @@ export function Home() {
      Open and a copyable link on it. The person who just pressed End is
      first-hand evidence, so the row reads ended from the first paint and the
      fetch below agrees a moment later. */
-  const endedHere = (useLocation().state as { endedRoomId?: string } | null)?.endedRoomId
+  const endedHere = useEndedHint()
 
   const refresh = useCallback(async () => {
     try {

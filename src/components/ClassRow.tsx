@@ -43,14 +43,17 @@ export function ClassRow({ room, copyLabel, onCopy, onOpen }: ClassRowProps) {
           </Badge>
         )}
       </span>
-      {/* An ended room cannot be joined, so offering Open and a link that
-          both dead-end is worse than offering neither.
+      {/* An ended class keeps its room and loses its audience: the link is a
+          409 for students until the teacher comes back, so Copy link goes and
+          Open becomes Start again. Opening it IS the restart - api/session
+          clears ended_at for the owner - which is why this is the same
+          navigation under a different word rather than a second action.
 
           The pair is full width on a phone, so it drops to its own line and
           the title keeps the one above it rather than being truncated to
           three letters. */}
-      {!room.endedAt && (
-        <span className="flex shrink-0 items-center gap-1 max-sm:w-full max-sm:justify-end">
+      <span className="flex shrink-0 items-center gap-1 max-sm:w-full max-sm:justify-end">
+        {!room.endedAt && (
           <Button
             variant="text"
             /* Sized for the wider of its two labels: "Copied" is shorter
@@ -62,11 +65,11 @@ export function ClassRow({ room, copyLabel, onCopy, onOpen }: ClassRowProps) {
           >
             {copyLabel}
           </Button>
-          <Button variant="secondary" onClick={onOpen}>
-            Open
-          </Button>
-        </span>
-      )}
+        )}
+        <Button variant="secondary" onClick={onOpen}>
+          {room.endedAt ? 'Start again' : 'Open'}
+        </Button>
+      </span>
     </li>
   )
 }

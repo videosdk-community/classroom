@@ -49,11 +49,33 @@ export default handle(async (req: VercelRequest, res: VercelResponse) => {
   if (!room) {
     throw new HttpError(404, 'room_not_found', 'That link does not point to a class.')
   }
-  if (room.ended_at) {
-    throw new HttpError(409, 'room_ended', 'This class has ended.')
-  }
 
   const isOwner = room.owner_id === user.id
+
+  /* An ended class is closed to its students and reopenable by its teacher.
+
+     A VideoSDK roomId outlives the session held in it, so "ended" is a fact
+     about the last class rather than about the room, and burning the link
+     would mean every returning teacher hands out a new one. The owner asking
+     for a token IS the restart, so the flag is cleared here rather than
+     through a second endpoint the teacher would have to remember to call.
+
+     Students still get the 409 in between. Ownership decides this, exactly as
+     it decides the permissions below - nothing in the request is consulted. */
+  if (room.ended_at) {
+    if (!isOwner) {
+      throw new HttpError(409, 'room_ended', 'This class has ended.')
+    }
+    const { error: reopenError } = await db
+      .from('rooms')
+      .update({ ended_at: null })
+      .eq('room_id', room.room_id)
+
+    if (reopenError) {
+      console.error('[api] reopen failed', reopenError)
+      throw new HttpError(500, 'internal', 'The class could not be reopened. Try again.')
+    }
+  }
 
   /* participantId is derived from the Supabase user id: stable across
      reloads, and unique per person. With version 2 in the payload this pins

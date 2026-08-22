@@ -207,6 +207,18 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
       askToUnmute: (id) => {
         void ref.current.participants.get(id)?.enableMic()
       },
+      /* The kick. Per-participant like the mute calls, and the ONE moderation
+         action with no consent step: the student is dropped and finds out
+         from onMeetingLeft, whose code the server puts on the websocket close
+         frame (1002 for this call, 1008/1010 for the dashboard and the REST
+         endpoint - see LEAVE_REMOVED in types.ts).
+
+         Nothing here blocks a rejoin, and nothing should read as though it
+         does. The link still works and the student lands back in the lobby,
+         where the teacher decides again. */
+      removeFromClass: (id) => {
+        void ref.current.participants.get(id)?.remove()
+      },
       /* startRecording(webhookUrl, awsDirPath, config, transcription). ALL FOUR
          ARGUMENTS ARE POSITIONAL and all four are optional, so the two leading
          nulls are load-bearing: `startRecording(RECORDING_CONFIG)` would pass

@@ -41,6 +41,9 @@ export {
   LEAVE_MEETING_END_API,
   LEAVE_DUPLICATE_PARTICIPANT,
   LEAVE_MANUAL,
+  LEAVE_REMOVED,
+  LEAVE_REMOVED_ALL,
+  LEAVE_REMOVED_API,
 } from './types'
 
 export type {
@@ -52,10 +55,10 @@ export type {
   MediaRequest,
   WhiteboardState,
   RoomMessage,
+  TrackKind,
 } from './types'
 
 export { encodeControls, encodeHand, DEFAULT_CONTROLS } from './controls'
-  TrackKind,
 export type { ClassControls } from './controls'
 
 export { usePrecall } from './media/usePrecall'

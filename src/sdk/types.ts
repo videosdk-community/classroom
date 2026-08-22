@@ -67,6 +67,22 @@ export const LEAVE_MEETING_END_API = 1009
 export const LEAVE_DUPLICATE_PARTICIPANT = 1011
 export const LEAVE_MANUAL = 1101
 
+/* Being removed, all three ways the server can say it.
+
+   REMOVE_PEER is a moderator calling participant.remove() from an SDK, which
+   is what this app does; REMOVE_ALL and REMOVE_PEER_API are the dashboard and
+   the REST endpoint, neither of which the classroom calls but both of which
+   land on the student as the same event and mean the same thing to them.
+   Treating them as one reason is the honest reading: the student was removed,
+   and by whom is not their question to answer.
+
+   The code arrives on the websocket close frame from the server, not from
+   anything the SDK decides locally - see js-sdk's `_webSocket.on("close")`,
+   which forwards `data.reason` straight into the leave. */
+export const LEAVE_REMOVED = 1002
+export const LEAVE_REMOVED_ALL = 1008
+export const LEAVE_REMOVED_API = 1010
+
 export interface EntryDecision {
   participantId: string
   decision: 'allowed' | 'denied'
@@ -115,6 +131,13 @@ export interface RoomSnapshot {
   participantIds: readonly string[]
   participants: Readonly<Record<string, ParticipantView>>
   activeSpeakerId: string | null
+  /* Who is sharing a screen, or null.
+
+     From onPresenterChanged, which is the only broadcast signal there is -
+     `screenShareOn` on a participant row is per-id and would need the whole
+     roster polled to answer "is anyone presenting". One presenter at a time is
+     the SDK's own model, not a rule this app adds. */
+  presenterId: string | null
   isRecording: boolean
   whiteboard: WhiteboardState
   entryQueue: readonly EntryRequest[]
@@ -124,10 +147,3 @@ export interface RoomSnapshot {
   topics: Readonly<Record<string, readonly RoomMessage[]>>
   lastError: { code: number; message: string } | null
 }
-  /* Who is sharing a screen, or null.
-
-     From onPresenterChanged, which is the only broadcast signal there is -
-     `screenShareOn` on a participant row is per-id and would need the whole
-     roster polled to answer "is anyone presenting". One presenter at a time is
-     the SDK's own model, not a rule this app adds. */
-  presenterId: string | null

@@ -38,6 +38,7 @@ export interface SidePanelProps {
   onMute: (id: string) => void
   onAskToUnmute: (id: string) => void
   onLowerHand: (id: string) => void
+  onRemove: (id: string) => void
   promoted: readonly string[]
   onPromote: (id: string) => void
   onDemote: (id: string) => void
@@ -63,6 +64,7 @@ export function SidePanel({
   onMute,
   onAskToUnmute,
   onLowerHand,
+  onRemove,
   promoted,
   onPromote,
   onDemote,
@@ -122,6 +124,7 @@ export function SidePanel({
           onMute={onMute}
           onAskToUnmute={onAskToUnmute}
           onLowerHand={onLowerHand}
+          onRemove={onRemove}
           canPromote={mode === 'lecture' && self.role === 'teacher'}
           onPromote={onPromote}
           onDemote={onDemote}

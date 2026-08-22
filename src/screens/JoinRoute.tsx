@@ -205,6 +205,16 @@ const EXIT_COPY: Record<
     body: 'One account can hold one seat, and the newest tab keeps it. Close the others and rejoin here.',
     canAskAgain: true,
   },
+  /* Removed by the teacher. Ask again is offered because it is true: nothing
+     bars this student, the link still works, and asking again puts them back
+     in the lobby where the teacher decides. Saying otherwise would be a
+     stronger promise than the app can keep. */
+  removed: {
+    tone: 'danger',
+    title: 'The teacher removed you from the class',
+    body: 'You can ask to join again, and they will see your request in the same place as everyone else.',
+    canAskAgain: true,
+  },
 }
 
 function ExitScreen({
@@ -238,7 +248,11 @@ function ExitScreen({
         <Alert tone={copy.tone} title={copy.title}>
           {copy.body}
         </Alert>
-        <div className="flex gap-2">
+        {/* Centred under the card rather than ragged-left. These screens are
+            the whole page - there is nothing else on it to align to - and a
+            left-aligned pair under a full-width card reads as the start of a
+            form that never arrives. */}
+        <div className="flex justify-center gap-2">
           {copy.canAskAgain && (
             <Button size="lg" onClick={onAskAgain}>
               Ask again

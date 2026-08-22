@@ -69,6 +69,15 @@ export interface RoomActions {
       what happened rather than having to count the roster. */
   muteEveryoneElse: () => number
   askToUnmute: (id: string) => void
+  /* Kick. `remove()` hangs off the Participant object, same as disableMic,
+     and it is the one moderation call with no consent step anywhere - the
+     student is dropped and told by the leave reason, not asked.
+
+     Named removeFromClass rather than removeParticipant on purpose: this
+     store already has a removeParticipant that deletes a row from the
+     snapshot when somebody leaves. One name for "forget this row" and
+     another for "eject this person" is worth the extra word. */
+  removeFromClass: (id: string) => void
   /* Cloud recording. Fire-and-forget on purpose: the truth about whether it
      is running arrives on onRecordingStateChanged, not from the return of
      these calls, so nothing here awaits a promise whose value would be stale
@@ -154,6 +163,10 @@ export function createRoomStore(teacherId: string | null = null) {
     end: () => (actions ? actions.end() : notReady('end')()),
     toggleMic: () => (actions ? actions.toggleMic() : notReady('toggleMic')()),
     toggleWebcam: () => (actions ? actions.toggleWebcam() : notReady('toggleWebcam')()),
+    toggleScreenShare: async () => {
+      if (actions) await actions.toggleScreenShare()
+      else notReady('toggleScreenShare')()
+    },
     muteParticipant: (id) =>
       actions ? actions.muteParticipant(id) : notReady('muteParticipant')(),
     /* The only action with a return value, so it cannot fall through to
@@ -163,13 +176,11 @@ export function createRoomStore(teacherId: string | null = null) {
     muteEveryoneElse: () => {
       if (actions) return actions.muteEveryoneElse()
       notReady('muteEveryoneElse')()
-    toggleScreenShare: async () => {
-      if (actions) await actions.toggleScreenShare()
-      else notReady('toggleScreenShare')()
-    },
       return 0
     },
     askToUnmute: (id) => (actions ? actions.askToUnmute(id) : notReady('askToUnmute')()),
+    removeFromClass: (id) =>
+      actions ? actions.removeFromClass(id) : notReady('removeFromClass')(),
     startRecording: () => (actions ? actions.startRecording() : notReady('startRecording')()),
     stopRecording: () => (actions ? actions.stopRecording() : notReady('stopRecording')()),
     startWhiteboard: async () => {
@@ -228,6 +239,7 @@ export function createRoomStore(teacherId: string | null = null) {
     setMeeting: (meetingId: string | null, localId: string | null) =>
       commit({ meetingId, localId }),
     setActiveSpeaker: (activeSpeakerId: string | null) => commit({ activeSpeakerId }),
+    setPresenter: (presenterId: string | null) => commit({ presenterId }),
     setRecording: (isRecording: boolean) => commit({ isRecording }),
     setError: (lastError: { code: number; message: string } | null) => commit({ lastError }),
     setLeaveReason: (leaveReason: LeaveReason | null) => commit({ leaveReason }),
@@ -239,7 +251,6 @@ export function createRoomStore(teacherId: string | null = null) {
       emit()
     },
 
-    setPresenter: (presenterId: string | null) => commit({ presenterId }),
     /* Structural sharing. If nothing about this participant changed, the
        existing object is kept, so `participants` holds reference identity for
        untouched rows and a mic toggle on one person does not re-render the

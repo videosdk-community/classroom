@@ -42,6 +42,11 @@ const PATHS = {
      at once. Distinct from `micOff`, which is self-mute. */
   muteAll:
     '<path d="M9 4a3 3 0 0 1 6 0v6a3 3 0 0 1-.4 1.5"/><path d="M5 10v2a7 7 0 0 0 11.5 5.4"/><path d="M19 12v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/><line x1="2" y1="2" x2="22" y2="22"/>',
+  /* Added here, not in source: a person with a minus, for removing a student
+     from the class. Icon-only on the roster row - a fourth worded button in a
+     320px panel truncates every name to its initials. */
+  userMinus:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="16" y1="11" x2="22" y2="11"/>',
 } as const
 
 export type IconName = keyof typeof PATHS

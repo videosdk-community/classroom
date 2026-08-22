@@ -4,6 +4,9 @@ import { LiveClassroom } from './LiveClassroom'
 import {
   LEAVE_DUPLICATE_PARTICIPANT,
   LEAVE_MEETING_END_API,
+  LEAVE_REMOVED,
+  LEAVE_REMOVED_ALL,
+  LEAVE_REMOVED_API,
   LEAVE_ROOM_CLOSE,
   useEntryDecision,
   useLeaveReason,
@@ -19,7 +22,7 @@ import { ToastProvider } from '../design/ui'
    can read the store. Everything it decides is handed back up to JoinRoute,
    which owns the screens that must render with no meeting behind them. */
 
-export type ExitReason = 'declined' | 'left' | 'ended' | 'evicted' | 'ask-again'
+export type ExitReason = 'declined' | 'left' | 'ended' | 'evicted' | 'removed' | 'ask-again'
 
 export interface RoomGateProps {
   mode: ClassMode
@@ -72,7 +75,7 @@ export function RoomGate({
          the student's console the moment the teacher ends the class. Only the
          exits we decide ourselves - a denial, the lobby's own buttons - are
          still connected at this point. */
-      if (reason !== 'ended' && reason !== 'evicted') actions.leave()
+      if (reason !== 'ended' && reason !== 'evicted' && reason !== 'removed') actions.leave()
       onExitRef.current(reason)
     },
     [actions],
@@ -101,7 +104,16 @@ export function RoomGate({
   useEffect(() => {
     if (!leaveReason) return
     if (leaveReason.code === LEAVE_DUPLICATE_PARTICIPANT) exit('evicted')
+    /* Checked before the room-closed codes on purpose: being removed and the
+       class ending both arrive as a disconnect, and the student is owed the
+       one that is actually about them. */
     else if (
+      leaveReason.code === LEAVE_REMOVED ||
+      leaveReason.code === LEAVE_REMOVED_ALL ||
+      leaveReason.code === LEAVE_REMOVED_API
+    ) {
+      exit('removed')
+    } else if (
       leaveReason.code === LEAVE_ROOM_CLOSE ||
       leaveReason.code === LEAVE_MEETING_END_API
     ) {

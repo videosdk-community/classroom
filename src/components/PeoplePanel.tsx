@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { KnockRow } from './KnockRow'
 import { RoomIcon } from './icons'
+import { cn } from '../design/ui'
 import type { Person } from '../domain/classroom'
 import type { EntryRequest } from '../sdk'
 
@@ -18,6 +19,10 @@ export interface PeoplePanelProps {
   onMute: (id: string) => void
   onAskToUnmute: (id: string) => void
   onLowerHand: (id: string) => void
+  /** The kick. Last in the row and the only destructive action here, so it is
+      the only one drawn in danger red. It does not bar anyone: the link still
+      works and the student comes back as a knock. */
+  onRemove: (id: string) => void
   /** Lecture only. In Class everyone is onstage already, so there is nothing
       to promote anyone to. */
   canPromote: boolean
@@ -41,10 +46,14 @@ function initials(name: string) {
 function RowAction({
   label,
   onClick,
+  danger,
   children,
 }: {
   label: string
   onClick: () => void
+  /** Removing is the one action on this row that cannot be taken back inside
+      the class, so it is the one that does not look like its neighbours. */
+  danger?: boolean
   children: ReactNode
 }) {
   return (
@@ -53,7 +62,12 @@ function RowAction({
       title={label}
       aria-label={label}
       onClick={onClick}
-      className="h-6 shrink-0 cursor-pointer rounded-md border border-line-strong bg-transparent px-1.5 text-sm text-ink-secondary hover:bg-inset"
+      className={cn(
+        'flex h-6 shrink-0 cursor-pointer items-center rounded-md border bg-transparent px-1.5 text-sm',
+        danger
+          ? 'border-danger-fg/40 text-danger-fg hover:bg-danger-bg'
+          : 'border-line-strong text-ink-secondary hover:bg-inset',
+      )}
     >
       {children}
     </button>
@@ -67,6 +81,7 @@ export function PeoplePanel({
   onMute,
   onAskToUnmute,
   onLowerHand,
+  onRemove,
   canPromote,
   onPromote,
   onDemote,
@@ -139,6 +154,18 @@ export function PeoplePanel({
               ) : (
                 <RowAction label={`Ask ${p.name} to unmute`} onClick={() => onAskToUnmute(p.id)}>
                   Ask to unmute
+                </RowAction>
+              )}
+              {/* Never on the teacher's own row, and never on another
+                  teacher's - a room can hold more than one allow_mod holder
+                  and they do not get to eject each other from a roster. */}
+              {p.role !== 'teacher' && (
+                <RowAction
+                  label={`Remove ${p.name} from the class`}
+                  danger
+                  onClick={() => onRemove(p.id)}
+                >
+                  <RoomIcon name="userMinus" size={13} />
                 </RowAction>
               )}
             </div>

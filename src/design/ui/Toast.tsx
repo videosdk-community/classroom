@@ -74,28 +74,26 @@ export function ToastProvider({ children }: ToastProviderProps) {
       {/* pointer-events-none on the container and auto on each card: the stack
           floats over the room, so anything not actually a toast must stay
           click-through. role/aria-live announce without stealing focus. */}
-      {/* Bottom RIGHT, not bottom centre, and the reason is the board.
+      {/* Bottom CENTRE, stacked clear of both bars.
 
-          Centred is the reflex and it was wrong here: the hosted whiteboard
-          puts its own toolbar in a centred pill along its bottom edge, so a
-          centred toast lands squarely on the pen and the eraser for four
-          seconds - directly after the teacher pressed a button, which is the
-          worst possible moment to cover their tools. Measured in the browser,
-          not guessed: the toast came up at x 605-835, the toolbar sits at
-          about x 500-940.
+          Two pieces of furniture own the bottom of this screen. The control bar
+          is a 64px row pinned to the viewport bottom; the hosted whiteboard puts
+          its draw tools in a centred pill along the board's own bottom edge,
+          measured at 56px tall, and the board sits 24px above the control bar
+          (the p-6 stage padding). Sitting the toast "just above the control bar"
+          literally would drop it straight onto the pen and the eraser for four
+          seconds, right after the teacher pressed a button.
 
-          It also sits BELOW the board rather than over it. Floated just above
-          the board's bottom edge, a dark card straddles that edge - half of it
-          on the white board, half melting into the near-black surround, so the
-          card appears to bleed off the corner rather than to sit anywhere. Down
-          here it is wholly on the dark chrome, in the empty right flank the
-          control bar's buttons never reach, and it reads as a message from the
-          room rather than as something dropped on the lesson. */}
+          So the offset is that stack added up - 64 control bar + 24 padding + 56
+          toolbar + 12 breathing room - which puts the card centred, wholly on the
+          board, directly above the tools instead of over them. Below 800px of
+          board width the hosted toolbar wraps to 104px and will reach the card;
+          that is the narrow-board tradeoff, not an oversight. */}
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed z-50 flex flex-col items-end gap-2"
-        style={{ bottom: 12, right: 20 }}
+        className="pointer-events-none fixed left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+        style={{ bottom: 156 }}
       >
         {toasts.map((t) => {
           const tone = TONES[t.tone]
@@ -103,7 +101,17 @@ export function ToastProvider({ children }: ToastProviderProps) {
             <div
               key={t.id}
               className={cn('pointer-events-auto flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-base leading-5')}
-              style={{ background: tone.bg, boxShadow: `inset 0 0 0 1px ${tone.bd}`, color: tone.fg }}
+              /* The tone backgrounds are translucent by design - dark theme
+                 mixes them at 25% alpha against the app's near-black chrome.
+                 The card now floats over the WHITE whiteboard, where that alpha
+                 blends toward white instead and leaves a washed pastel behind
+                 light tone text. Painting the tone layer over an opaque surface
+                 gives the same colour the tokens intend, on any backdrop. */
+              style={{
+                background: `linear-gradient(0deg, ${tone.bg}, ${tone.bg}), var(--surface-overlay)`,
+                boxShadow: `inset 0 0 0 1px ${tone.bd}, 0 8px 24px rgba(0,0,0,0.45)`,
+                color: tone.fg,
+              }}
             >
               <span className="min-w-0">{t.message}</span>
               <button

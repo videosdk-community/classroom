@@ -54,7 +54,7 @@ async function request<T>(path: string, init: RequestInit & { headers?: Record<s
     throw new ApiError(
       res.status,
       'not_json',
-      `${path} did not return JSON. Is the app running under \`pnpm dev\` (vercel dev), not \`pnpm dev:vite\`?`,
+      `${path} did not return JSON. Is the app running under \`pnpm dev:api\` (vercel dev), rather than \`pnpm dev\`, which is Vite alone and serves no /api?`,
     )
   }
 

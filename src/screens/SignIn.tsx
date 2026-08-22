@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Input, Spinner } from '../design/ui'
 import { useAuth } from '../auth/context'
 import { writeDisplayName } from '../lib/displayName'
 import { supabase } from '../lib/supabase'
 import wordmark from '../assets/videosdk-wordmark-white.svg'
 
-/* The one way in. A name and a button.
+/* The one way in, and the one way to stop being a guest.
 
    signInAnonymously() is not a lesser session. It creates a real row in
    auth.users with a real id and a real JWT carrying the authenticated role;
@@ -19,11 +19,24 @@ import wordmark from '../assets/videosdk-wordmark-white.svg'
    before you reach the camera preview are gone, and not one line of the role
    derivation moved to make it happen.
 
-   Magic link stays below the fold as the way to get an account that outlives
-   the browser. emailRedirectTo is built from window.location.origin, never a
-   hardcoded URL, so localhost and the deployed domain both work from one
-   build. The `next` param rides along so a student who arrived on a class
-   link lands back on that link rather than on Home.
+   This screen serves three states, and the third is the reason it does not
+   simply redirect when someone is already signed in:
+
+     signed out         name + Continue, or an email link instead
+     signed in, guest   attach an email to the account you already have
+     signed in, real    nothing to do here, go where you were going
+
+   The guest case is a merge, not a sign-in. updateUser({ email }) links an
+   email identity to the existing account, so the user id never changes and
+   every room already pointing at it comes along - no migration, nothing for
+   api/session.ts to notice. Calling signInWithOtp here instead would create a
+   SECOND account and silently strand every class the guest had started, which
+   is exactly the bug this branch exists to prevent.
+
+   emailRedirectTo is built from window.location.origin, never a hardcoded
+   URL, so localhost and the deployed domain both work from one build. The
+   `next` param rides along so a student who arrived on a class link lands
+   back on that link rather than on Home.
 
    The name is collected here rather than on Precall because it is the only
    field on the screen - asking for it costs nothing, and it spares everyone
@@ -36,10 +49,28 @@ function safeNext(raw: string | null): string {
   return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
 }
 
+/* Supabase reports both of these as messages rather than codes worth matching
+   on exactly, so match loosely and fall back to its own words.
+
+   The rate limit is the one that shows up in practice: the built-in sender
+   allows only a handful of messages an hour for the whole project, and "email
+   rate limit exceeded" tells the person at the keyboard nothing they can act
+   on. It is not their address that is wrong. */
+function isTaken(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes('already been registered') || m.includes('already registered')
+}
+
+function isRateLimited(message: string): boolean {
+  return message.toLowerCase().includes('rate limit')
+}
+
 export function SignIn() {
-  const { status } = useAuth()
+  const { status, user } = useAuth()
   const [params] = useSearchParams()
   const next = safeNext(params.get('next'))
+
+  const isGuest = user?.is_anonymous === true
 
   const [method, setMethod] = useState<'guest' | 'email'>('guest')
   const [name, setName] = useState('')
@@ -54,9 +85,9 @@ export function SignIn() {
       </div>
     )
   }
-  /* Both paths end here. Nothing navigates by hand: the sign-in flips status
-     through onAuthStateChange and this fires on the next render. */
-  if (status === 'signedIn') return <Navigate to={next} replace />
+  /* A guest stays here on purpose - they came to attach an email, and this is
+     where that happens. Only a permanent account has nothing left to do. */
+  if (status === 'signedIn' && !isGuest) return <Navigate to={next} replace />
 
   const enterAsGuest = async (e: FormEvent) => {
     e.preventDefault()
@@ -83,30 +114,55 @@ export function SignIn() {
     setError(null)
     setState('sending')
 
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        shouldCreateUser: true,
-      },
-    })
+    const address = email.trim()
+
+    /* The branch that keeps a guest's classes. updateUser links the address to
+       the account already signed in; signInWithOtp would start a new one. */
+    const { error: err } = isGuest
+      ? await supabase.auth.updateUser(
+          { email: address },
+          {
+            /* Marked so the callback waits for the account to actually stop
+               being a guest. Without it that screen sees an already-signed-in
+               visitor and redirects before the confirmation lands. */
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}&confirm=email`,
+          },
+        )
+      : await supabase.auth.signInWithOtp({
+          email: address,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+            shouldCreateUser: true,
+          },
+        })
 
     if (err) {
-      setError(err.message)
+      if (isGuest && isTaken(err.message)) {
+        setError(
+          'That address already has an account. Sign into it in a new browser - but the classes you started as a guest will stay behind, because they belong to this account and not that one.',
+        )
+      } else if (isRateLimited(err.message)) {
+        setError(
+          'Too many sign-in emails have gone out from this project in the last hour. Nothing was changed - wait a little and try again.',
+        )
+      } else {
+        setError(err.message)
+      }
       setState('idle')
       return
     }
     setState('sent')
   }
 
-  /* Keyed so React remounts the field instead of reusing the node in the
-     same slot - autoFocus only fires on mount, so without it the toggle
-     leaves the caret on the button you just clicked. */
   const switchTo = (to: 'guest' | 'email') => {
     setMethod(to)
     setError(null)
     setState('idle')
   }
+
+  /* A signed-in guest only ever sees the email form - there is no second name
+     to choose and no second account to make. */
+  const showingEmail = isGuest || method === 'email'
 
   return (
     <div className="flex h-full items-center justify-center bg-canvas p-6">
@@ -126,10 +182,74 @@ export function SignIn() {
           {/* Says what you are actually doing. Someone who arrived on a class
               link is joining a class, not signing up for a product. */}
           <h1 className="text-2xl font-semibold text-ink">
-            {next.startsWith('/c/') ? 'Join the class' : 'Get started'}
+            {isGuest ? 'Sign in' : next.startsWith('/c/') ? 'Join the class' : 'Get started'}
           </h1>
 
-          {method === 'guest' ? (
+          {state === 'sent' ? (
+            <>
+              <Alert tone="success" title="Check your email">
+                A link is on its way to <span className="text-ink">{email.trim()}</span>. Open it in
+                this browser - it only completes where it was requested.
+              </Alert>
+              {isGuest && (
+                <p className="text-sm text-ink-tertiary">
+                  Nothing has changed yet. Your classes are still here, and confirming the address
+                  keeps them on this same account.
+                </p>
+              )}
+            </>
+          ) : showingEmail ? (
+            <>
+              {isGuest && (
+                <p className="text-base text-ink-secondary">
+                  You are signed in as a guest. Add an email and you keep this same account, and
+                  every class on it - the email is only a way back in.
+                </p>
+              )}
+
+              <form className="flex flex-col gap-3" onSubmit={(e) => void sendLink(e)}>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm text-ink-tertiary">Email</span>
+                  <Input
+                    key="email"
+                    size="lg"
+                    type="email"
+                    required
+                    autoFocus
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    error={Boolean(error)}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+
+                {error && <Alert tone="danger">{error}</Alert>}
+
+                <Button
+                  size="lg"
+                  type="submit"
+                  disabled={state === 'sending' || email.trim() === ''}
+                >
+                  {state === 'sending' ? 'Sending the link' : 'Email me a link'}
+                </Button>
+              </form>
+
+              <p className="text-sm text-ink-tertiary">
+                No password. We email you a link that signs you in.{' '}
+                {isGuest ? (
+                  <Link className="text-ink-link hover:underline" to={next}>
+                    Back to your classes
+                  </Link>
+                ) : (
+                  <Button variant="link" onClick={() => switchTo('guest')}>
+                    Continue as a guest
+                  </Button>
+                )}
+                .
+              </p>
+            </>
+          ) : (
             <>
               <form className="flex flex-col gap-3" onSubmit={(e) => void enterAsGuest(e)}>
                 <label className="flex flex-col gap-1.5">
@@ -163,45 +283,6 @@ export function SignIn() {
                 No account needed. To keep your classes across devices,{' '}
                 <Button variant="link" onClick={() => switchTo('email')}>
                   use an email address instead
-                </Button>
-                .
-              </p>
-            </>
-          ) : state === 'sent' ? (
-            <Alert tone="success" title="Check your email">
-              A sign-in link is on its way to <span className="text-ink">{email.trim()}</span>. Open
-              it in this browser - the link only completes where it was requested.
-            </Alert>
-          ) : (
-            <>
-              <form className="flex flex-col gap-3" onSubmit={(e) => void sendLink(e)}>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-sm text-ink-tertiary">Email</span>
-                  <Input
-                    key="email"
-                    size="lg"
-                    type="email"
-                    required
-                    autoFocus
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    error={Boolean(error)}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </label>
-
-                {error && <Alert tone="danger">{error}</Alert>}
-
-                <Button size="lg" type="submit" disabled={state === 'sending' || email.trim() === ''}>
-                  {state === 'sending' ? 'Sending the link' : 'Email me a link'}
-                </Button>
-              </form>
-
-              <p className="text-sm text-ink-tertiary">
-                No password. We email you a link that signs you in.{' '}
-                <Button variant="link" onClick={() => switchTo('guest')}>
-                  Continue as a guest
                 </Button>
                 .
               </p>

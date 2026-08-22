@@ -505,25 +505,38 @@ is no insert policy, and `insert` is revoked from `authenticated`.
 
 ## A guest can keep everything by adding an email
 
-`updateUser({ email })` on the signed-in guest links an email identity to the account that
-already exists. **The user id does not change.** That is the whole reason this works: `owner_id`
-on every one of their rooms already points at that id, so the classes come along with no
-migration, no reassignment and nothing for `api/session.ts` to notice. `is_anonymous` flips to
-false once the address is confirmed, and the UI follows - the prompt disappears and "Start over"
-becomes "Sign out".
+"Sign in" in the header, for a guest, does not sign them out and start over. It goes to `/signin`,
+which recognises a signed-in guest and calls `updateUser({ email })` instead of `signInWithOtp`.
+That links an email identity to the account that already exists. **The user id does not change.**
+That is the whole reason this works: `owner_id` on every one of their rooms already points at that
+id, so the classes come along with no migration, no reassignment and nothing for `api/session.ts`
+to notice. `is_anonymous` flips to false once the address is confirmed, and the header switches
+from "Sign in" to "Sign out" on its own.
 
-Probed rather than assumed, on a live guest that owned a class:
+The branch is the point. Calling `signInWithOtp` for a signed-in guest would create a **second**
+account and silently strand every class the first one owned. Verified at the wire rather than by
+reading the code - the two paths hit different endpoints:
+
+```
+signed out    POST /auth/v1/otp   ?redirect_to=...%2Fauth%2Fcallback%3Fnext%3D%252F
+signed-in guest  PUT /auth/v1/user   ?redirect_to=...%2Fauth%2Fcallback%3Fnext%3D%252F%26confirm%3Demail
+```
+
+And the linking itself, probed on a live guest that owned a class:
 
 ```
 BEFORE is_anonymous: true   identities: []
 AFTER  is_anonymous: false  identities: ['email']   SAME USER ID: true
 ```
-and the room row was still there, same `room_id`, now owned by a permanent account with the
-display name intact.
+with the room row still there, same `room_id`, display name intact.
+
+`/signin` therefore serves three states, and the third is why it no longer redirects the moment
+someone is signed in: signed out gets name + Continue; a signed-in guest gets the email form; a
+signed-in permanent account gets sent where it was going.
 
 Requires **Manual Linking** enabled on the project (`GOTRUE_SECURITY_MANUAL_LINKING_ENABLED`).
-It is separate from the anonymous provider toggle, and there is no capability to feature-detect -
-the refusal is the only sign it is off.
+Separate from the anonymous provider toggle, and there is no capability to feature-detect - the
+refusal is the only sign it is off.
 
 **The stale-claim trap.** `is_anonymous` is a claim inside the access token, not something read
 live. An account upgraded out of band keeps showing the guest UI until the token is refreshed,
@@ -531,18 +544,23 @@ because the stored JWT still says `true`. The real flow does not hit this: confi
 returns a fresh session through the redirect. Anything that changes an account server-side does,
 and the fix is `refreshSession()`, not a reload.
 
-`/auth/callback` needed one change for this. A guest confirming an address is **already signed
-in** when they land, so the existing `status === 'signedIn'` redirect fired before the
-confirmation applied. The redirect URL now carries `confirm=email`, and the screen waits for
-`is_anonymous === false` instead.
+`/auth/callback` needed one change. A guest confirming an address is **already signed in** when
+they land, so the existing `status === 'signedIn'` redirect fired before the confirmation applied.
+The redirect URL carries `confirm=email`, and the screen waits for `is_anonymous === false`
+instead.
 
 **Not handled, deliberately:** linking to an address that already has an account. Supabase refuses
 outright and does not merge. Merging would mean rewriting `rooms.owner_id` across two users, which
 `rooms_update_own` cannot express - its `with check` is `auth.uid() = owner_id`, so nobody can hand
 a row to somebody else. That is a service-role endpoint, and it does not exist. The copy says so.
 
-**The sender quota is the thing that breaks a demo.** This path sends through the same built-in
-Supabase sender as the magic link, capped at a few messages an hour for the whole project. It is
-what "email rate limit exceeded" means, and that message tells nobody anything actionable, so it
-is mapped to copy that says nothing was changed and to try again shortly. A real SMTP provider is
-the fix if this is ever demoed live.
+**The built-in sender is what blocks this end to end, and it is two limits, not one.** It caps
+messages per hour for the whole project - `over_email_send_rate_limit`, HTTP 429, which the
+dashboard rate-limit setting does not lift past the service's own ceiling - and separately it
+**refuses to deliver to any address that is not on the project team**. So no `@example.com` probe
+can ever complete this flow, and the send-and-click leg is untested for that reason. Custom SMTP
+is the fix, and is the only way to demo it live.
+
+`generateLink({ type: "email_change_new" })` is not a way around it: it answers
+`400 An email address is required`, because a guest has no current address for the change to be
+*from*.

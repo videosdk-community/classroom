@@ -26,6 +26,14 @@ import wordmark from '../assets/videosdk-wordmark-white.svg'
      signed in, guest   attach an email to the account you already have
      signed in, real    nothing to do here, go where you were going
 
+   Which means "signed in as a guest" has to be split by how they got that
+   way. Someone who just typed a name here is on their way into a class and
+   must not be stopped to be sold an email; someone who arrived already a
+   guest came from the Sign in button in the header and wants exactly that
+   form. `createdHere` is the difference. It is set BEFORE the await, not
+   after: the auth change and this flag then land in the same render, so the
+   redirect happens without a frame of the email form flashing up first.
+
    The guest case is a merge, not a sign-in. updateUser({ email }) links an
    email identity to the existing account, so the user id never changes and
    every room already pointing at it comes along - no migration, nothing for
@@ -87,6 +95,9 @@ export function SignIn() {
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  /* Set only when this screen is the thing that made the guest account. */
+  const [createdHere, setCreatedHere] = useState(false)
+
   if (status === 'loading') {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
@@ -94,9 +105,13 @@ export function SignIn() {
       </div>
     )
   }
-  /* A guest stays here on purpose - they came to attach an email, and this is
-     where that happens. Only a permanent account has nothing left to do. */
-  if (status === 'signedIn' && !isGuest) return <Navigate to={next} replace />
+  /* A guest who arrived already signed in stays: they came to attach an
+     email, and this is where that happens. Everyone else leaves - a permanent
+     account has nothing to do here, and a guest created a moment ago was
+     heading into a class, not shopping for an account. */
+  if (status === 'signedIn' && (!isGuest || createdHere)) {
+    return <Navigate to={next} replace />
+  }
 
   const enterAsGuest = async (e: FormEvent) => {
     e.preventDefault()
@@ -104,11 +119,14 @@ export function SignIn() {
     setState('sending')
 
     const chosen = name.trim()
+    setCreatedHere(true)
+
     const { error: err } = await supabase.auth.signInAnonymously({
       options: { data: { display_name: chosen } },
     })
 
     if (err) {
+      setCreatedHere(false)
       setError(err.message)
       setState('idle')
       return

@@ -86,6 +86,17 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
     onSpeakerChanged(activeSpeakerId) {
       store.setActiveSpeaker(activeSpeakerId)
     },
+    /* The only broadcast screen-share signal there is.
+
+       It fires on every participant with the presenter's id, and again with
+       null when the share stops - including when the browser's own "Stop
+       sharing" bar is used, which no app-side click can be listened for. That
+       is why presence is read from here rather than from a local flag: a
+       teacher who stops from Chrome's bar and a teacher who stops from the
+       control bar have to look identical to the class. */
+    onPresenterChanged(presenterId) {
+      store.setPresenter(presenterId ?? null)
+    },
     onRecordingStateChanged({ status }) {
       store.setRecording(status === 'RECORDING_STARTED' || status === 'RECORDING_STARTING')
     },
@@ -153,6 +164,22 @@ export function MeetingBridge({ store }: { store: RoomStore }) {
       end: () => ref.current.end(),
       toggleMic: () => ref.current.toggleMic(),
       toggleWebcam: () => ref.current.toggleWebcam(),
+      /* getDisplayMedia sits inside this, so the promise carries the picker's
+         outcome. A dismissed picker rejects with NotAllowedError, and that is
+         a teacher changing their mind rather than a fault - it is swallowed
+         here so no toast, no error banner and no store write happens for it.
+
+         Nothing is written to the store on success either. Presence comes
+         back on presenter-changed, which is also the only way the browser's
+         own "Stop sharing" bar can be noticed, so an optimistic flag here
+         would disagree with the class the moment that bar is used. */
+      toggleScreenShare: async () => {
+        try {
+          await ref.current.toggleScreenShare()
+        } catch (err) {
+          warn('screen share was not started', err)
+        }
+      },
       /* Moderation is PER-PARTICIPANT, not a meeting-level call. plan.md
          reads as though disableMic/enableMic sit on useMeeting; they do not
          (participant.d.ts:70-82). They hang off the Participant object, so

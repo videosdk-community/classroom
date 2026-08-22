@@ -8,6 +8,7 @@ import type {
   RoomMessage,
   RoomSnapshot,
   RoomStatus,
+  TrackKind,
 } from './types'
 
 /* The room store.
@@ -29,6 +30,7 @@ const INITIAL: RoomSnapshot = {
   participantIds: [],
   participants: {},
   activeSpeakerId: null,
+  presenterId: null,
   isRecording: false,
   whiteboard: { url: null, inFlight: false, error: null },
   entryQueue: [],
@@ -53,6 +55,14 @@ export interface RoomActions {
   end: () => void
   toggleMic: () => void
   toggleWebcam: () => void
+  /* Screen share, start and stop through one call.
+
+     Async because the browser's own picker is in the middle of it: the
+     promise settles when the user has chosen a surface or dismissed the
+     dialog, and a dismissal REJECTS. Nothing that calls this may leave the
+     rejection unhandled - a teacher pressing Escape on the picker is the
+     ordinary case, not an error worth surfacing. */
+  toggleScreenShare: () => Promise<void>
   muteParticipant: (id: string) => void
   /** Every remote mic off, in one pass. The SDK has no mute-all.
       Returns how many mics it actually turned off, so the teacher gets told
@@ -106,7 +116,7 @@ export function createRoomStore(teacherId: string | null = null) {
   /* Also outside the snapshot: live MediaStreams. A track mutation would
      otherwise bump the version for the whole tree. Audio and video elements
      subscribe to this registry directly. */
-  const tracks = new Map<string, { mic?: MediaStream; cam?: MediaStream }>()
+  const tracks = new Map<string, Partial<Record<TrackKind, MediaStream>>>()
   const trackListeners = new Set<(id: string) => void>()
 
   let actions: RoomActions | null = null
@@ -153,6 +163,10 @@ export function createRoomStore(teacherId: string | null = null) {
     muteEveryoneElse: () => {
       if (actions) return actions.muteEveryoneElse()
       notReady('muteEveryoneElse')()
+    toggleScreenShare: async () => {
+      if (actions) await actions.toggleScreenShare()
+      else notReady('toggleScreenShare')()
+    },
       return 0
     },
     askToUnmute: (id) => (actions ? actions.askToUnmute(id) : notReady('askToUnmute')()),
@@ -225,6 +239,7 @@ export function createRoomStore(teacherId: string | null = null) {
       emit()
     },
 
+    setPresenter: (presenterId: string | null) => commit({ presenterId }),
     /* Structural sharing. If nothing about this participant changed, the
        existing object is kept, so `participants` holds reference identity for
        untouched rows and a mic toggle on one person does not re-render the
@@ -313,13 +328,13 @@ export function createRoomStore(teacherId: string | null = null) {
     },
 
     // ---- non-reactive registries ---------------------------------------
-    setTrack(id: string, kind: 'mic' | 'cam', stream: MediaStream | undefined) {
+    setTrack(id: string, kind: TrackKind, stream: MediaStream | undefined) {
       const entry = tracks.get(id) ?? {}
       if (entry[kind] === stream) return
       tracks.set(id, { ...entry, [kind]: stream })
       for (const l of trackListeners) l(id)
     },
-    getTrack: (id: string, kind: 'mic' | 'cam') => tracks.get(id)?.[kind],
+    getTrack: (id: string, kind: TrackKind) => tracks.get(id)?.[kind],
     subscribeTracks(listener: (id: string) => void) {
       trackListeners.add(listener)
       return () => trackListeners.delete(listener)

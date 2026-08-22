@@ -26,6 +26,14 @@ export type RoomStatus =
   | 'disconnected'
   | 'failed'
 
+/* The three live media kinds, as the track registry keys them.
+
+   `screen` is one track per presenter, not per participant: the SDK allows a
+   single presenter at a time and reports who it is on presenter-changed. The
+   registry still keys it by participant id, because that is the id the stream
+   arrives on. */
+export type TrackKind = 'mic' | 'cam' | 'screen'
+
 export interface ParticipantView {
   id: string
   name: string
@@ -116,3 +124,10 @@ export interface RoomSnapshot {
   topics: Readonly<Record<string, readonly RoomMessage[]>>
   lastError: { code: number; message: string } | null
 }
+  /* Who is sharing a screen, or null.
+
+     From onPresenterChanged, which is the only broadcast signal there is -
+     `screenShareOn` on a participant row is per-id and would need the whole
+     roster polled to answer "is anyone presenting". One presenter at a time is
+     the SDK's own model, not a rule this app adds. */
+  presenterId: string | null

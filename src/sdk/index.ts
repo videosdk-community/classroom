@@ -19,6 +19,7 @@ export {
   useParticipantIds,
   useParticipantView,
   useParticipantViews,
+  usePresenterId,
   useIsRecording,
   useWhiteboard,
   useEntryQueue,
@@ -54,6 +55,7 @@ export type {
 } from './types'
 
 export { encodeControls, encodeHand, DEFAULT_CONTROLS } from './controls'
+  TrackKind,
 export type { ClassControls } from './controls'
 
 export { usePrecall } from './media/usePrecall'

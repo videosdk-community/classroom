@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useRef, useSyncExternalStore } 
 import { CLASS_CONTROLS_TOPIC, HANDS_TOPIC } from './topics'
 import { foldControls, foldHands, type ClassControls } from './controls'
 import type { RoomStore } from './store'
-import type { ParticipantView, RoomMessage, RoomSnapshot } from './types'
+import type { ParticipantView, RoomMessage, RoomSnapshot, TrackKind } from './types'
 
 export const RoomStoreContext = createContext<RoomStore | null>(null)
 
@@ -61,6 +61,7 @@ const selStatus = (s: RoomSnapshot) => s.status
 const selLocalId = (s: RoomSnapshot) => s.localId
 const selTeacherId = (s: RoomSnapshot) => s.teacherId
 const selIds = (s: RoomSnapshot) => s.participantIds
+const selPresenter = (s: RoomSnapshot) => s.presenterId
 const selRecording = (s: RoomSnapshot) => s.isRecording
 const selWhiteboard = (s: RoomSnapshot) => s.whiteboard
 const selEntryQueue = (s: RoomSnapshot) => s.entryQueue
@@ -75,6 +76,8 @@ export const useLocalId = () => useSelector(selLocalId)
     built without one, which no real room does. */
 export const useTeacherId = () => useSelector(selTeacherId)
 export const useParticipantIds = () => useSelector(selIds, arrayEqual)
+/** Who is sharing a screen, or null. One presenter at a time, from the SDK. */
+export const usePresenterId = () => useSelector(selPresenter)
 export const useIsRecording = () => useSelector(selRecording)
 export const useWhiteboard = () => useSelector(selWhiteboard)
 export const useEntryQueue = () => useSelector(selEntryQueue, arrayEqual)
@@ -122,7 +125,7 @@ export function useRoomActions() {
 }
 
 /** Live media for one participant, from the non-reactive registry. */
-export function useTrack(id: string, kind: 'mic' | 'cam') {
+export function useTrack(id: string, kind: TrackKind) {
   const store = useRoomStore()
   const subscribe = useCallback(
     (onChange: () => void) =>

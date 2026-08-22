@@ -6,8 +6,10 @@ import type { ClassMode } from '../domain/classroom'
 /* The control bar. Everything the spec's room surface names: self controls,
    the board, teacher controls, panel toggles, leave.
 
-   Screen share is deliberately absent. It competes with the board for centre
-   stage, and the board is the whole point of this product. */
+   Screen share sits with the teacher controls rather than with the self
+   controls, next to the board it displaces. It is the one control here that
+   takes centre stage away from the board, so it reads as a teaching decision
+   and not as a personal media toggle like the mic. */
 
 export type PanelKind = 'chat' | 'people' | null
 
@@ -38,6 +40,18 @@ export interface ControlBarProps {
   boardOn: boolean
   boardBusy: boolean
   onToggleBoard: () => void
+  /** Whether the LOCAL participant is presenting, not whether anyone is. The
+      SDK offers no way to stop someone else's share, so a control lit by
+      another person's presence would be a button that cannot do its job. */
+  sharingScreen: boolean
+  /** Somebody else is presenting. One presenter at a time is the SDK's model,
+      so the control disables itself rather than failing on the click. */
+  shareTakenBy: string | null
+  /** Whether this browser can share a screen at all. getDisplayMedia is
+      absent on mobile and tablet browsers, so the control says why it is off
+      rather than opening nothing. */
+  shareSupported: boolean
+  onToggleShare: () => void
   isRecording: boolean
   onToggleRecording: () => void
   onMuteAll: () => void
@@ -73,6 +87,10 @@ export function ControlBar({
   boardOn,
   boardBusy,
   onToggleBoard,
+  sharingScreen,
+  shareTakenBy,
+  shareSupported,
+  onToggleShare,
   isRecording,
   onToggleRecording,
   onMuteAll,
@@ -185,6 +203,33 @@ export function ControlBar({
             onClick={onToggleBoard}
           >
             <RoomIcon name="board" size={18} />
+          </CtrlBtn>
+          {/* Screen share. Desktop only - getDisplayMedia does not exist on
+              mobile browsers, and a control that opens nothing is worse than
+              one that says why it is off.
+
+              Teacher-only in the same sense the board control is: any token
+              holder can call enableScreenShare, and hiding the button is a
+              convention rather than a permission. The difference is that a
+              student's share would be visible to the class the moment it
+              started, so the honest surface is the stage, which names whoever
+              is presenting rather than assuming it is the teacher. */}
+          <CtrlBtn
+            label={
+              sharingScreen
+                ? 'Stop sharing your screen'
+                : !shareSupported
+                  ? 'Screen sharing needs a desktop browser'
+                  : shareTakenBy
+                    ? `${shareTakenBy} is sharing a screen`
+                    : 'Share your screen'
+            }
+            text="Share"
+            active={sharingScreen}
+            disabled={!sharingScreen && (!shareSupported || shareTakenBy !== null)}
+            onClick={onToggleShare}
+          >
+            <RoomIcon name="share" size={18} />
           </CtrlBtn>
           {/* Red while recording, because it matches the badge the top bar
               shows the whole class. The state comes from the SDK's own

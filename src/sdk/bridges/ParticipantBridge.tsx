@@ -11,8 +11,16 @@ import type { RoomStore } from '../store'
    whole tree. */
 
 export function ParticipantBridge({ id, store }: { id: string; store: RoomStore }) {
-  const { displayName, micOn, webcamOn, isLocal, isActiveSpeaker, micStream, webcamStream } =
-    useParticipant(id)
+  const {
+    displayName,
+    micOn,
+    webcamOn,
+    isLocal,
+    isActiveSpeaker,
+    micStream,
+    webcamStream,
+    screenShareStream,
+  } = useParticipant(id)
 
   useEffect(() => {
     store.upsertParticipant(id, {
@@ -35,6 +43,17 @@ export function ParticipantBridge({ id, store }: { id: string; store: RoomStore 
     store.setTrack(id, 'cam', stream)
     return () => store.setTrack(id, 'cam', undefined)
   }, [store, id, webcamStream])
+
+  /* The share track, on whoever is presenting. Never rendered in a tile - the
+     stage reads it by presenter id. object-fit differs from a camera's too:
+     a cropped screen loses the line of code the class is being shown. */
+  useEffect(() => {
+    const stream = screenShareStream?.track
+      ? new MediaStream([screenShareStream.track])
+      : undefined
+    store.setTrack(id, 'screen', stream)
+    return () => store.setTrack(id, 'screen', undefined)
+  }, [store, id, screenShareStream])
 
   return null
 }

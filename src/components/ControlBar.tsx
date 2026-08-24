@@ -1,6 +1,8 @@
 import { CtrlBtn } from './CtrlBtn'
+import { PhoneControlBar } from './PhoneControlBar'
 import { RoomIcon } from './icons'
 import { Toggle } from '../design/ui'
+import { useDeviceClass } from '../lib/useDeviceClass'
 import type { ClassMode } from '../domain/classroom'
 
 /* The control bar. Everything the spec's room surface names: self controls,
@@ -73,7 +75,12 @@ export interface ControlBarProps {
   onLeave: () => void
 }
 
-export function ControlBar({
+export function ControlBar(props: ControlBarProps) {
+  if (useDeviceClass() === 'phone') return <PhoneControlBar {...props} />
+  return <DesktopControlBar {...props} />
+}
+
+function DesktopControlBar({
   meta,
   micOn,
   camOn,
@@ -111,8 +118,13 @@ export function ControlBar({
           whatever is left after the title. */}
       {meta && (
         <div className="pointer-events-none absolute left-4 flex min-w-0 items-center gap-3">
-          <span className="hidden truncate text-base font-semibold text-ink lg:block">
+          {/* Tablet (md-lg) truncates rather than hides - a squeezed title
+              still says something, where an absent one says nothing. */}
+          <span className="hidden max-w-[120px] truncate text-base font-semibold text-ink md:block lg:max-w-none">
             {meta.title}
+          </span>
+          <span className="hidden rounded-md bg-inset px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary md:inline lg:hidden">
+            {meta.mode.slice(0, 1)}
           </span>
           <span className="hidden rounded-md bg-inset px-2 py-0.5 text-xs uppercase tracking-wide text-ink-tertiary lg:inline">
             {meta.mode}
@@ -143,7 +155,9 @@ export function ControlBar({
             className="h-1.5 w-1.5 rounded-pill"
             style={{ background: 'var(--red-600)' }}
           />
-          <span className="font-medium text-ink-secondary">Live</span>
+          {/* "Live" drops on tablet - the dot plus the number is the part
+              that is actually load-bearing. */}
+          <span className="hidden font-medium text-ink-secondary lg:inline">Live</span>
           {meta.elapsed}
         </div>
       )}

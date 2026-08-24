@@ -40,6 +40,11 @@ export function usePrecall() {
   const devices = usePrecallDevices()
   const tracks = useRef<PrecallTracks>({})
   const [preview, setPreview] = useState<MediaStream | undefined>()
+  /* The mic stream needs to be state, not just a ref like the camera's twin
+     below: MicMeter opens an AudioContext on it, so it has to re-run when the
+     stream changes. Held in the ref alone it never reached the meter, and the
+     bar sat at zero however loud you spoke. */
+  const [micPreview, setMicPreview] = useState<MediaStream | undefined>()
 
   const refreshDevices = useCallback(async () => {
     const [cams, mics] = await Promise.all([devices.cameras(), devices.microphones()])
@@ -127,6 +132,7 @@ export function usePrecall() {
     if (state !== 'granted' || !micOn || !microphoneId) {
       stopStream(tracks.current.microphone)
       tracks.current.microphone = undefined
+      setMicPreview(undefined)
       return
     }
     let cancelled = false
@@ -138,8 +144,10 @@ export function usePrecall() {
         const next = await createPreviewMicrophone(microphoneId)
         if (cancelled) { stopStream(next); return }
         tracks.current.microphone = next
+        setMicPreview(next)
       } catch (err) {
         warn('could not open the microphone', err)
+        if (!cancelled) setMicPreview(undefined)
       }
     })()
     return () => { cancelled = true }
@@ -156,6 +164,7 @@ export function usePrecall() {
     stopStream(tracks.current.microphone)
     tracks.current = {}
     setPreview(undefined)
+    setMicPreview(undefined)
   }, [])
 
   return {
@@ -167,6 +176,7 @@ export function usePrecall() {
     camOn,
     micOn,
     preview,
+    micPreview,
     setCameraId,
     setMicrophoneId,
     setCamOn,

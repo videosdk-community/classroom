@@ -190,7 +190,7 @@ export function Precall({ onJoin, title, name, notice, busy = false }: PrecallPr
                   options={p.microphones.map((m) => ({ label: m.label, value: m.id }))}
                   onChange={(v) => p.setMicrophoneId(v)}
                 />
-                <MicMeter stream={p.micOn ? p.preview : undefined} />
+                <MicMeter stream={p.micOn ? p.micPreview : undefined} />
               </label>
 
               <Button size="lg" onClick={join} disabled={!canJoin}>

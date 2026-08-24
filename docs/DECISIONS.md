@@ -993,3 +993,30 @@ Driven in a browser at three widths in a Class room: the board fills its stage a
 390px, 820px and 1440px with no black bars at any of them, the "too small" warning still fires on
 tablet/desktop below 800px actual width and stays off on phone, and the teacher's knock/hands overlay
 stack still lands correctly at the top-right of the board at both a narrow and a wide width.
+
+## The precall mic meter needed the mic stream as state, not just a ref
+
+`MicMeter` was live from the day it was written and had never once moved.
+
+`usePrecall` opens two preview streams. The camera's is published as `preview` state, because the
+`<video>` element has to be re-pointed whenever it changes. The microphone's was only ever stored in
+`tracks.current.microphone`, the ref that exists so the streams survive the hand-off to
+`MeetingProvider` without blinking. `Precall.tsx` then passed `p.preview` to `MicMeter` - the camera
+stream. `MicMeter` asks for `stream.getAudioTracks()`, found none, and pinned the bar at `width: 0%`
+for good. With the camera off it received `undefined` instead, and pinned it for the same reason.
+
+Nothing about it looked broken. There is no error, no warning, and an empty level bar in a quiet room
+is exactly what a working meter shows. It is a component whose entire job is to prove the selected
+microphone is producing audio, and it was answering "no" unconditionally.
+
+The mic stream is now `micPreview` state alongside `preview`, cleared when the mic is toggled off or
+the device fails to open, and `Precall.tsx` passes that. It has to be state rather than a ref because
+`MicMeter` opens an `AudioContext` on the stream in an effect keyed to it; a ref would never
+re-trigger that effect.
+
+The ref stays as it is. It is what `handOff()` returns, and that is a separate job from feeding the
+meter - the stream is deliberately handed over still running, so the mic does not blink between
+precall and the room.
+
+Verified by driving a browser with Chromium's fake audio device, which emits a tone: the bar tracks
+the tone and returns to zero when the mic is toggled off.

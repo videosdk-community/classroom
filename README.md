@@ -57,9 +57,16 @@ const { startWhiteboard, stopWhiteboard, whiteboardUrl } = useWhiteboard();
 
 | | |
 |---|---|
-| ![Teacher view of the online classroom with the shared whiteboard centre stage](docs/screenshots/classroom-desktop.png)<br>**Teacher view.** Board centre stage, video rail alongside, class controls below. | ![Student view of the read-only collaborative whiteboard](docs/screenshots/whiteboard-student.png)<br>**Student view.** The board is read-only, but the zoom menu still works so a student can catch up. |
-| ![Teacher admitting a student from the classroom lobby queue](docs/screenshots/lobby-knock.png)<br>**The lobby.** Students knock, the teacher admits or denies from a queue. | ![Classroom chat panel with a raised hand](docs/screenshots/chat-hands.png)<br>**Chat and hands.** Both persist, so a late joiner picks up the room's current state. |
-| ![Cloud recording list with the in-browser player open](docs/screenshots/recordings.png)<br>**Recordings.** Owner-only list with an in-browser player and a download link. | ![Online classroom running on a phone with the whiteboard visible](docs/screenshots/mobile-classroom.png)<br>**On a phone.** One converged layout, board still visible. |
+| ![Student view of the read-only collaborative whiteboard in an online classroom](docs/screenshots/whiteboard-student.png)<br>**The student's board.** Read-only: no toolbar, no undo. The zoom menu still works, so a student can catch up to wherever the teacher drew. The teacher's cursor is labelled as it moves. | ![Teacher admitting a student from the online classroom lobby queue](docs/screenshots/lobby-knock.png)<br>**The lobby.** A student holding the weaker token cannot walk in. They knock, and the teacher admits or denies from the queue. |
+| ![Classroom chat panel beside the whiteboard, with a student's hand raised](docs/screenshots/chat-hands.png)<br>**Chat and raised hands.** Both ride persisted pubsub, so a student who joins late or reloads picks up the room as it stands. | ![Cloud recording of the class playing back with the whiteboard and named cursors composited in](docs/screenshots/recordings.png)<br>**The recording includes the board.** Ink, live cursors with name tags, and participant tiles, all composited. Owner-only list with a player and a download link. |
+
+### Class and Lecture
+
+Mode is picked when the room is created and fixed for its lifetime. The layout follows from it.
+
+| | |
+|---|---|
+| ![Class mode layout with every participant onstage in a video rail above the shared whiteboard](docs/screenshots/class-mode.png)<br>**Class.** Everyone is onstage, capped at 12 tiles with a `+N` chip for the rest. Made for a seminar where students are expected to talk. | ![Lecture mode layout with only the teacher onstage beside the whiteboard](docs/screenshots/lecture-mode.png)<br>**Lecture.** Only the teacher is onstage, and a student who needs to speak gets promoted. Everyone can still draw. Made for a room too big for a grid. |
 
 ## Installation
 

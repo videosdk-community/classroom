@@ -30,6 +30,8 @@ Class titles: `Regex 201: Now You Have Two Problems` for the Class-mode room,
 
 | File | What must be in frame |
 |---|---|
+| `home.png` | Signed-in teacher's Home: the start-a-class control and a populated class list. Never an empty state |
+| `precall.png` | The device-check screen: camera preview area, device pickers, mic meter, join control. Shot on **real hardware**, without the fake-media flags, so the pickers show real device names. Camera off in frame, and no frame of the real camera saved |
 | `classroom-desktop.png` | Hero. Teacher in Class mode, board centre stage with ink, tiles and control bar visible |
 | `class-mode.png` | Class layout with several students joined, so the everyone-onstage arrangement is obvious |
 | `lecture-mode.png` | Lecture layout, teacher onstage. Must visibly differ from `class-mode.png` |

@@ -131,9 +131,11 @@ The built-in email sender is capped at a few messages an hour. `node scripts/dev
 
 ### Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/videosdk-community/classroom)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvideosdk-community%2Fclassroom&env=VIDEOSDK_API_KEY,VIDEOSDK_SECRET,SUPABASE_SERVICE_ROLE_KEY,VITE_SUPABASE_URL,VITE_SUPABASE_PUBLISHABLE_KEY&envDescription=Keys%20and%20secret%20from%20the%20VideoSDK%20dashboard%2C%20plus%20the%20URL%20and%20keys%20from%20your%20Supabase%20project.&envLink=https%3A%2F%2Fdub.sh%2FX5Fn46e%3Futm_source%3Dclassroom_deploy_btn%26utm_medium%3Dgithub%26utm_campaign%3Dclassroom)
 
-Import the repo on Vercel, set the same five variables, ship. `vercel.json` already routes `api/` to functions and everything else to the SPA. Add the deployed origin to the Supabase redirect allowlist afterwards.
+The button copies the repo into your account, prompts for the five variables, and deploys. `vercel.json` already routes `api/` to functions and everything else to the SPA.
+
+Two things still have to happen by hand afterwards: run the migrations against the Supabase project you pointed it at, and add the deployed origin to the Supabase redirect allowlist. Without the second one, sign-in redirects back to a blocked URL.
 
 ## Usage
 

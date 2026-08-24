@@ -881,3 +881,76 @@ Driven end to end: End leaves the row "ended | Start again"; a student on the sa
 class has ended"; Start again puts the teacher back in the same `roomId`; the student's original link
 then reaches precall; and a fresh document reading `/classes` shows the row live again with Copy link
 and Open back. The student-facing copy says the link keeps working rather than asking for a new one.
+
+## The room screen is responsive: phone, tablet, desktop, as a third axis
+
+Until now the room screen had one real breakpoint - `PANEL_OVERLAY_BREAKPOINT` in `boardGeometry.ts`,
+which floats the side panel when there is no longer room for it beside the board. That breakpoint is
+board-width arithmetic, not a device category, and it stays exactly as it was. Device class is a
+different question and a separate hook: `useDeviceClass()` in `src/lib/useDeviceClass.ts`, phone below
+768px, tablet 768-1023px, desktop from 1024px - Tailwind v4's own default `md`/`lg` breakpoints,
+unmodified in this project, kept in sync on purpose rather than reinvented. It is `useSyncExternalStore`-based
+for the same reason `useMediaQuery` is: the first paint already knows the answer, so a phone never
+renders the desktop tree for one frame first.
+
+`ClassMode` (fixed per room), the panel-overlay breakpoint (board width), and device class (screen
+size) are three independent axes. Nesting all three ad hoc would be a six-case matrix, so phone is a
+full override: it replaces stage assembly regardless of mode. Tablet and desktop keep today's
+mode-based tree unchanged (`VideoRail` for Class, `LectureStage` inside `SidePanel` for Lecture), and
+differ from each other only in how compact the control bar's title/clock cluster is.
+
+**Phone converges Class and Lecture onto one layout.** `MobileStrip` (`src/components/MobileStrip.tsx`)
+replaces both `VideoRail` and `LectureStage` below the phone breakpoint: teacher tile first, then the
+viewer's own tile, then everyone else scrollable - the ordering a student actually looks for, and the
+same ordering regardless of which mode the room was created in. The pin-then-dedupe-then-cap mechanics
+that `VideoRail` already had were extracted into `src/lib/railOrder.ts` so the two rails can't quietly
+drift on what "pinned" means; the pin *order* itself stayed a caller choice, because `VideoRail` pins
+self first and `MobileStrip` deliberately pins the teacher first, and collapsing that into one shared
+default would have silently changed one of the two.
+
+**The board renders on phone. Its geometry does not change to get there.** `BOARD_RATIO`,
+`MIN_BOARD`, `BOARD_HARD_FLOOR_WIDTH` and `isBoardBelowFloor` in `boardGeometry.ts` are untouched -
+they describe tldraw's measured chrome and the fixed 1280x720 recording composite, neither of which
+depends on who is looking at the board. What changes is only the shell's reaction: `BoardStage` takes
+a `warnOnSqueeze` prop (default `true`), and the phone caller passes `false`. The "this window is
+small for a whiteboard" banner is desktop/tablet-only now - its own text names an 800px threshold no
+phone can ever cross, so showing it there explained nothing. Driven in a browser at 390px: the board
+renders full-width with no banner, letterboxed to 16:9 inside the available stage height exactly as
+it is everywhere else, tldraw's own toolbar wrapped the way it does below 800px on any surface.
+
+**The recording badge lives on the strip on phone, not the control bar.** The rule that it is never
+hidden at any width predates this work and still holds - what is new is *where* it satisfies that rule
+below 768px. The phone control bar is already at capacity (see below), so a `recording` prop on
+`MobileStrip` puts a small always-visible "Rec" chip on the one surface that is mounted at every
+moment a phone participant is in the room, rather than behind a tap.
+
+**The phone control bar is a different button set, not a hidden subset.** `PhoneControlBar`
+(`src/components/PhoneControlBar.tsx`), dispatched from `ControlBar` when `useDeviceClass()` is
+`'phone'`. Fixed order: student gets Mic, Camera, Hand-raise, More, End; teacher gets Mic, Camera,
+More, End - no hand-raise slot, since a teacher has nobody to raise a hand to. Everything desktop's
+bar carries beyond that - Chat, Participants, the whiteboard toggle, screen share, recording,
+mute-all, and the two toggles that used to live in a nested teacher-only popover - flattens into one
+`BottomSheet`. Desktop's two-tier structure (bar, then a popover opened from it) has no room to nest
+again inside a sheet on a phone, so it becomes one tier there. Driven end to end in both a Class room
+and a Lecture room, as teacher: the bar shows exactly Mic/Camera/More/End; More opens the sheet with
+all six rows plus both toggles; Participants opens a second sheet titled "People (1)"; Escape closes
+either from a focus trap that holds while it is open, confirmed by the dialog rendering as the
+active/focused element in the accessibility tree.
+
+**`BottomSheet`** (`src/design/ui/BottomSheet.tsx`) is a new shared primitive, since none existed -
+scrim, `role="dialog" aria-modal="true"`, a hand-rolled focus trap and Escape-to-close (no library,
+matching every other overlay in this app), `max-height: 85dvh` so it never clips under mobile browser
+chrome, safe-area bottom padding (`index.html` now carries `viewport-fit=cover` so that resolves on a
+notched device), slide-up entrance. It backs both the phone "More" overflow and Chat/Participants on
+phone - one primitive, different children, rather than two ad hoc panels. On phone, `SidePanel` is not
+used at all: its other job, keeping `LectureStage` mounted, is already covered by `MobileStrip`.
+
+**Tablet squeezes the existing control bar; it does not get a new layout.** Between `md` (768px) and
+`lg` (1024px), `ControlBar`'s title/mode-chip/clock cluster truncates instead of the old binary
+hidden-below-`lg` / hidden-below-`sm`: the title stays visible and truncates at a fixed max-width, the
+mode chip shows its first letter, and the clock drops the word "Live" but keeps the dot and the
+number. Recording badge classes are untouched - it already had no responsive hiding, so it already
+satisfied "never hidden" through the squeeze band without a change. Driven at 820px in a Class room:
+title, mode letter and a bare elapsed time all show at once, none of them absent, and the rest of the
+tree (rail, board, control bar buttons) is pixel-identical to the desktop layout beneath it. Desktop
+at 1440px is unchanged from before this work.

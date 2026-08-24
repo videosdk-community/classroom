@@ -5,7 +5,10 @@ import { HandsChip } from '../components/HandsChip'
 import { KnockCard } from '../components/KnockCard'
 import { LeavePrompt } from '../components/LeavePrompt'
 import { MediaRequestPrompt } from '../components/MediaRequestPrompt'
+import { ChatPanel } from '../components/ChatPanel'
 import { ControlBar, type PanelKind } from '../components/ControlBar'
+import { PeoplePanel } from '../components/PeoplePanel'
+import { MobileStrip } from '../components/MobileStrip'
 import { ScreenStage } from '../components/ScreenStage'
 import { SidePanel } from '../components/SidePanel'
 import { TopBar } from '../components/TopBar'
@@ -13,10 +16,11 @@ import { VideoRail } from '../components/VideoRail'
 import type { ClassMode, Person } from '../domain/classroom'
 import { PANEL_OVERLAY_BREAKPOINT } from '../lib/boardGeometry'
 import { endRoom } from '../lib/rooms'
+import { useDeviceClass } from '../lib/useDeviceClass'
 import { useElapsedSeconds } from '../lib/useElapsedSeconds'
 import { useExitGuard } from '../lib/useExitGuard'
 import { useMediaQuery } from '../lib/useMediaQuery'
-import { useToast } from '../design/ui'
+import { BottomSheet, useToast } from '../design/ui'
 import {
   CHAT_TOPIC,
   CLASS_CONTROLS_TOPIC,
@@ -191,6 +195,12 @@ export function LiveClassroom({
     void actions.publish(CLASS_CONTROLS_TOPIC, encodeControls({ ...controls, ...patch }))
   }
 
+  /* Phone/tablet/desktop: independent of `mode` and of `overlayPanel` below,
+     which is board-width arithmetic, not device category. Phone overrides
+     stage assembly regardless of mode; tablet keeps today's mode-based tree. */
+  const deviceClass = useDeviceClass()
+  const isPhone = deviceClass === 'phone'
+
   const overlayPanel = useMediaQuery(`(max-width: ${PANEL_OVERLAY_BREAKPOINT - 1}px)`)
   const [wasOverlay, setWasOverlay] = useState(overlayPanel)
   if (wasOverlay !== overlayPanel) {
@@ -274,6 +284,19 @@ export function LiveClassroom({
   /* One stack, top-right, and it belongs to whichever surface is on centre
      stage. Knocks first: somebody waiting to be let in has nothing else on
      screen, while a raised hand is also in the rail and in the roster. */
+  /* Shared between the SidePanel (tablet/desktop) and the phone BottomSheet -
+     hoisted once so the two branches read the same roster and chat log
+     rather than mapping them twice. */
+  const peopleList = views.map((p) => toPerson(p, raisedHands, isOnstage(p)))
+  const chatMessages = messages.map((m) => ({
+    id: m.key,
+    who: m.senderName,
+    text: m.text,
+    mine: m.senderId === localId,
+    at: '',
+  }))
+  const effectiveChatEnabled = controls.chatEnabled || isTeacher
+
   const teacherOverlay = (
     <div className="flex flex-col items-end gap-2">
       <KnockCard
@@ -287,24 +310,39 @@ export function LiveClassroom({
 
   return (
     <div className="relative flex h-full flex-col bg-canvas">
-      {/* Lecture keeps the header. In Class it moves into the control bar,
-          which gives the rail and the board back the 56px. */}
-      {mode === 'lecture' && (
+      {/* Lecture keeps the header, on tablet/desktop. Phone never shows it -
+          the strip below carries the recording indicator instead - and in
+          Class it moves into the control bar, which gives the rail and the
+          board back the 56px. */}
+      {!isPhone && mode === 'lecture' && (
         <TopBar title={title} mode={mode} recording={recording} elapsed={elapsed} />
       )}
 
       <div className="relative flex min-h-0 flex-1">
         <main className="flex min-w-0 flex-1 flex-col">
-          {mode === 'class' && (
-            <VideoRail
+          {/* Phone converges both modes onto one strip: teacher first, then
+              the viewer's own tile - the ordering a student actually looks
+              for. Tablet/desktop keep the existing mode split. */}
+          {isPhone ? (
+            <MobileStrip
               ids={ids}
               selfId={localId}
               teacherId={teacherId}
               onSeeAll={() => setPanel('people')}
+              recording={recording}
             />
+          ) : (
+            mode === 'class' && (
+              <VideoRail
+                ids={ids}
+                selfId={localId}
+                teacherId={teacherId}
+                onSeeAll={() => setPanel('people')}
+              />
+            )
           )}
 
-          <div className="min-h-0 flex-1 p-6">
+          <div className={isPhone ? 'min-h-0 flex-1 p-2' : 'min-h-0 flex-1 p-6'}>
             {/* The board and the share share one region, and the share COVERS
                 rather than replaces. Unmounting BoardStage would unmount the
                 whiteboard iframe, and an iframe that remounts reloads - the
@@ -315,6 +353,7 @@ export function LiveClassroom({
                 url={whiteboard.url}
                 canDraw={isTeacher}
                 overlay={isTeacher && !presenterId ? teacherOverlay : undefined}
+                warnOnSqueeze={!isPhone}
               />
 
               {presenterId && (
@@ -405,18 +444,59 @@ export function LiveClassroom({
           />
         </main>
 
+        {/* Phone: chat/people are a tall bottom sheet, not a column - the
+            strip already carries what LectureStage would (teacher + self),
+            so there is nothing for SidePanel to keep alive here. */}
+        {isPhone && self && panel && (
+          <BottomSheet
+            open={Boolean(panel)}
+            onClose={() => setPanel(null)}
+            title={panel === 'chat' ? 'Messages' : `People (${peopleList.length})`}
+          >
+            {panel === 'chat' && (
+              <ChatPanel messages={chatMessages} enabled={effectiveChatEnabled} onSend={(text) => actions.publish(CHAT_TOPIC, text)} />
+            )}
+            {panel === 'people' && (
+              <PeoplePanel
+                people={peopleList}
+                selfId={self.id}
+                isTeacher={isTeacher}
+                onMute={actions.muteParticipant}
+                onAskToUnmute={actions.askToUnmute}
+                onLowerHand={(id) => void actions.publish(HANDS_TOPIC, encodeHand(id, false))}
+                onRemove={(id) => {
+                  const name = views.find((p) => p.id === id)?.name ?? 'That student'
+                  actions.removeFromClass(id)
+                  if (controls.promoted.includes(id)) {
+                    setControls({ promoted: controls.promoted.filter((p) => p !== id) })
+                  }
+                  toast(`Removed ${name} from the class`, 'danger')
+                }}
+                canPromote={mode === 'lecture' && isTeacher}
+                onPromote={(id) => {
+                  setControls({ promoted: [...controls.promoted, id] })
+                  actions.askToUnmute(id)
+                }}
+                onDemote={(id) => setControls({ promoted: controls.promoted.filter((p) => p !== id) })}
+                waiting={isTeacher ? waiting : EMPTY_QUEUE}
+                onRespond={(id, allow) => void actions.respondEntry(id, allow)}
+              />
+            )}
+          </BottomSheet>
+        )}
+
         {/* The column survives a hidden panel in Lecture, because the stage
             inside it is the only place the teacher's face exists in that
             mode. Once the window is narrow enough that the column floats, it
             goes away with the panel like everything else - the board keeps
             the width. */}
-        {self && (panel || (mode === 'lecture' && !overlayPanel)) && (
+        {!isPhone && self && (panel || (mode === 'lecture' && !overlayPanel)) && (
           <SidePanel
             panel={panel}
             mode={mode}
             self={toPerson(self, raisedHands, isOnstage(self))}
             teacherId={teacherId}
-            people={views.map((p) => toPerson(p, raisedHands, isOnstage(p)))}
+            people={peopleList}
             waiting={isTeacher ? waiting : EMPTY_QUEUE}
             onRespond={(id, allow) => void actions.respondEntry(id, allow)}
             onMute={actions.muteParticipant}
@@ -452,14 +532,8 @@ export function LiveClassroom({
             onDemote={(id) =>
               setControls({ promoted: controls.promoted.filter((p) => p !== id) })
             }
-            messages={messages.map((m) => ({
-              id: m.key,
-              who: m.senderName,
-              text: m.text,
-              mine: m.senderId === localId,
-              at: '',
-            }))}
-            chatEnabled={controls.chatEnabled || isTeacher}
+            messages={chatMessages}
+            chatEnabled={effectiveChatEnabled}
             onSend={(text) => actions.publish(CHAT_TOPIC, text)}
             overlay={overlayPanel}
             onHide={() => setPanel(null)}

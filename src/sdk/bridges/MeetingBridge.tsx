@@ -37,9 +37,13 @@ const STATUS: Record<string, RoomStatus> = {
    not forty tiled faces shrinking as the room fills. The recording is the
    lesson, and the lesson happens on the board.
 
-   The board is ratio-locked to 16:9 partly because of this composition - see
-   BOARD_RATIO in src/lib/boardGeometry.ts for the full reasoning, which is not
-   repeated here so the two cannot drift apart. */
+   This config carries no width/height field - the composite's shape is
+   whatever VideoSDK's SPOTLIGHT layout produces, assumed 1280x720, and
+   nothing here configures or reads it back. The on-screen board used to be
+   ratio-locked to match that assumption; it no longer is (see useBaseRect in
+   src/lib/boardGeometry.ts) - a viewer's live board and the eventual
+   recording can now differ in shape, which was accepted in exchange for the
+   board never being squeezed into a bad letterbox on a small screen. */
 const RECORDING_CONFIG = {
   layout: { type: 'SPOTLIGHT', priority: 'PIN' },
   theme: 'DARK',

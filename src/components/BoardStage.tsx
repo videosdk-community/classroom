@@ -28,10 +28,9 @@ export interface BoardStageProps {
   url: string | null
   /** App chrome that must sit over the board and inside its edges.
 
-      It goes in here rather than in the parent because the board is
-      ratio-locked and centred: on a short window the fitted rect is narrower
-      than the region around it, so anything anchored to the container hangs
-      off the board's edge and into the surround. Rendered in the
+      The board fills its container exactly now, so this and the parent are
+      the same box - it stays routed through here because the pointer-events
+      layering is defined next to the iframe it protects. Rendered in the
       pointer-events-none layer, so an interactive leaf must opt back in. */
   overlay?: ReactNode
   /** Whether this participant is meant to draw.

@@ -698,8 +698,10 @@ board the teacher deliberately closed reads as a broken control.
 The config is `{ layout: { type: 'SPOTLIGHT', priority: 'PIN' }, theme: 'DARK', mode:
 'video-and-audio', quality: 'high', orientation: 'landscape' }`. SPOTLIGHT rather than GRID because
 this is a board-centric class: what is worth keeping is the board and whoever is talking over it, not
-forty tiled faces shrinking as the room fills. The board is ratio-locked to 16:9 partly for this - the
-cloud composites at 1280x720, so the shape on screen is the shape the class gets back.
+forty tiled faces shrinking as the room fills. This config carries no width/height field - the
+composite's shape is whatever SPOTLIGHT produces, assumed 1280x720, and nothing here reads it back.
+The on-screen board used to be ratio-locked to match that assumption; it no longer is, see "The
+whiteboard fills its container" below.
 
 **`startRecording(webhookUrl, awsDirPath, config, transcription)` takes four positional arguments and
 all four are optional.** So `startRecording(RECORDING_CONFIG)` passes the config as the webhook URL
@@ -908,15 +910,13 @@ drift on what "pinned" means; the pin *order* itself stayed a caller choice, bec
 self first and `MobileStrip` deliberately pins the teacher first, and collapsing that into one shared
 default would have silently changed one of the two.
 
-**The board renders on phone. Its geometry does not change to get there.** `BOARD_RATIO`,
-`MIN_BOARD`, `BOARD_HARD_FLOOR_WIDTH` and `isBoardBelowFloor` in `boardGeometry.ts` are untouched -
-they describe tldraw's measured chrome and the fixed 1280x720 recording composite, neither of which
-depends on who is looking at the board. What changes is only the shell's reaction: `BoardStage` takes
-a `warnOnSqueeze` prop (default `true`), and the phone caller passes `false`. The "this window is
-small for a whiteboard" banner is desktop/tablet-only now - its own text names an 800px threshold no
-phone can ever cross, so showing it there explained nothing. Driven in a browser at 390px: the board
-renders full-width with no banner, letterboxed to 16:9 inside the available stage height exactly as
-it is everywhere else, tldraw's own toolbar wrapped the way it does below 800px on any surface.
+**The board renders on phone.** `MIN_BOARD`, `BOARD_HARD_FLOOR_WIDTH` and `isBoardBelowFloor` in
+`boardGeometry.ts` are untouched - they describe tldraw's measured chrome, which doesn't depend on
+who is looking at the board. What changes is only the shell's reaction: `BoardStage` takes a
+`warnOnSqueeze` prop (default `true`), and the phone caller passes `false`. The "this window is small
+for a whiteboard" banner is desktop/tablet-only now - its own text names an 800px threshold no phone
+can ever cross, so showing it there explained nothing. (The board no longer letterboxes to 16:9 at
+all, on any screen - see "The whiteboard fills its container" below, a later decision than this one.)
 
 **The recording badge lives on the strip on phone, not the control bar.** The rule that it is never
 hidden at any width predates this work and still holds - what is new is *where* it satisfies that rule
@@ -954,3 +954,42 @@ satisfied "never hidden" through the squeeze band without a change. Driven at 82
 title, mode letter and a bare elapsed time all show at once, none of them absent, and the rest of the
 tree (rail, board, control bar buttons) is pixel-identical to the desktop layout beneath it. Desktop
 at 1440px is unchanged from before this work.
+
+## The whiteboard fills its container, at every screen size
+
+The previous phase kept the board ratio-locked to 16:9 everywhere and only suppressed its "too small"
+warning on phone. Driven in a browser on a 390px phone, that lock was the actual problem, not the
+warning: a 16:9 box fit to a narrow width comes out barely 220px tall on a screen with 600+px of
+height to give it, so the board sat as a thin strip between two large black bars. Reopening this with
+that evidence: the 16:9 lock was never something the SDK required. `boardGeometry.ts`'s own header
+comment already said the board "has NO intrinsic aspect ratio - it fills whatever box it is given",
+and a check of `RECORDING_CONFIG` (`src/sdk/bridges/MeetingBridge.tsx`) confirms it carries no
+width/height/ratio field at all - the cloud composite's shape is an assumed property of SPOTLIGHT,
+referenced only in comments, never fed by or into `BOARD_RATIO`. The two numbers were chosen to
+agree; nothing in the code ever enforced that.
+
+**`useBaseRect` no longer fits a ratio - it hands back the container's own width and height,
+unmodified.** `BOARD_RATIO` had exactly one consumer (this hook's default parameter) and is deleted
+rather than left as dead code. `extraX`/`extraY` on `BaseRect` stay in the type - they're always `0`
+now - so `fractionToPx` and every overlay call site keep working without a signature change; a
+raise-hand chip positioned at a fraction of the rect lands at that fraction of the true container.
+
+**Everything that was actually about width, not ratio, is untouched.** `BOARD_HARD_FLOOR_WIDTH`,
+`isBoardBelowFloor`, `warnOnSqueeze` and its phone-off wiring all describe tldraw's own toolbar
+wrapping below 800px, which has nothing to do with letterboxing and is exactly as true of a
+now-tall-and-full-bleed board as it was of a ratio-locked one. `MIN_BOARD.width` still feeds
+`PANEL_OVERLAY_BREAKPOINT`; `MIN_BOARD.height` is now informational only, since nothing derives a
+ratio from it. `ScreenStage` was already `absolute inset-0`, independent of the board's shape, and
+needed no change.
+
+**The recording composite is unaffected, on purpose, and the two can now visually differ.** VideoSDK's
+SPOTLIGHT layout still composites at whatever shape it always has - nothing here ever configured that,
+so nothing here changed it. A desktop viewer's on-screen board and the class's eventual recording can
+now differ in aspect, where before they were made to agree by construction. That trade was made
+explicitly in favor of the board never being squeezed into an unusable shape on a small screen, over
+against a wide viewer's live view exactly matching a wide recording.
+
+Driven in a browser at three widths in a Class room: the board fills its stage area edge to edge at
+390px, 820px and 1440px with no black bars at any of them, the "too small" warning still fires on
+tablet/desktop below 800px actual width and stays off on phone, and the teacher's knock/hands overlay
+stack still lands correctly at the top-right of the board at both a narrow and a wide width.

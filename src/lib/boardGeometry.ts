@@ -9,20 +9,19 @@ import { useEffect, useRef, useState } from 'react'
 
    The single most important fact: the board has NO intrinsic aspect ratio.
    It fills whatever box it is given, exactly, less a 2px border, at every one
-   of the nine ladder steps. So the ratio is ours to choose, which means a bad
-   one is our bug and not the SDK's. */
-
-/** 16:9. Chosen, not imposed.
-
-    Two reasons. The cloud recording composites at 1280x720, so an on-screen
-    board of the same shape is the one the class actually gets back. And
-    MIN_BOARD below is already 16:9 to within half a pixel, so the ratio and
-    the floor agree instead of fighting each other. */
-export const BOARD_RATIO = 16 / 9
+   of the nine ladder steps. useBaseRect below used to spend that freedom on a
+   fixed 16:9 letterbox, chosen (not imposed - nothing requires it) to match
+   the cloud recording's assumed 1280x720 composite. On a tall narrow phone
+   that letterbox left the board a thin strip between two black bars, which is
+   the more concrete cost - the composite was never actually coupled to it in
+   code, only in the choice to keep the two numbers equal. The board now
+   fills its container exactly, at every screen size; the recording composite
+   is unaffected either way, since nothing here ever configured it. */
 
 /** Smallest size at which the board is still comfortable to teach on.
     At this size tldraw keeps its toolbar to a single 56px row and every piece
-    of its furniture is present. */
+    of its furniture is present. Width feeds PANEL_OVERLAY_BREAKPOINT below;
+    height is informational only now that the board no longer fits a ratio. */
 export const MIN_BOARD = { width: 900, height: 506 } as const
 
 /** The point where the board stops being usable, measured rather than guessed.
@@ -122,16 +121,14 @@ export interface BaseRect {
 
 const EMPTY_RECT: BaseRect = { width: 0, height: 0, extraX: 0, extraY: 0 }
 
-/** The largest ratio-locked box that fits the observed container, plus the
-    letterbox offsets needed to centre it.
+/** The observed container, exactly - no ratio lock, no letterbox.
 
+    extraX/extraY are always 0 now; kept on BaseRect rather than dropped so
+    fractionToPx and every overlay call site below keep working unchanged.
     Overlay positions are stored as fractions of this rect (0-1) rather than
     as pixels, so a raise-hand FAB lands in the same place on a 13-inch laptop
-    and a 27-inch monitor. Converting back is fractionToPx below.
-
-    Maths carried over from the prototype's Board.tsx, which got this part
-    right even though it got the board's furniture wrong. */
-export function useBaseRect(ratio: number = BOARD_RATIO) {
+    and a 27-inch monitor. Converting back is fractionToPx below. */
+export function useBaseRect() {
   const ref = useRef<HTMLDivElement>(null)
   const [rect, setRect] = useState<BaseRect>(EMPTY_RECT)
 
@@ -145,18 +142,12 @@ export function useBaseRect(ratio: number = BOARD_RATIO) {
          0x0 rect. Writing it means a wasted render and a frame where the
          board is absent rather than merely unsized. */
       if (width === 0 || height === 0) return
-      const fittedHeight = width / ratio
-      if (fittedHeight <= height) {
-        setRect({ width, height: fittedHeight, extraX: 0, extraY: (height - fittedHeight) / 2 })
-      } else {
-        const fittedWidth = height * ratio
-        setRect({ width: fittedWidth, height, extraX: (width - fittedWidth) / 2, extraY: 0 })
-      }
+      setRect({ width, height, extraX: 0, extraY: 0 })
     })
 
     ro.observe(el)
     return () => ro.disconnect()
-  }, [ratio])
+  }, [])
 
   return { ref, rect }
 }

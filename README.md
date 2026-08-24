@@ -1,16 +1,14 @@
 <div align="center">
 
-<img src="public/favicon.svg" width="72" alt="Classroom" />
-
 # Classroom
 
 **An open-source online classroom app built with React and VideoSDK, where a shared whiteboard is the centre of the screen instead of a side panel.**
 
+![Online classroom app in React with a shared whiteboard, live video rail and class controls](docs/screenshots/classroom-desktop.png)
+
 [![Built on VideoSDK](https://img.shields.io/badge/built%20on-VideoSDK-9d7bff?style=flat-square)](https://videosdk.live) [![React 19](https://img.shields.io/badge/React-19-149eca?style=flat-square&logo=react&logoColor=white)](https://react.dev) [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org) [![Vite 8](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)](https://vite.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE) [![Live demo](https://img.shields.io/badge/live-demo-000000?style=flat-square&logo=vercel&logoColor=white)](https://classroom-by-videosdk.vercel.app)
 
 **[Live demo](https://classroom-by-videosdk.vercel.app) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Whiteboard docs](https://docs.videosdk.live/react/guide/video-and-audio-calling-api-sdk/collaboration-in-meeting/whiteboard)**
-
-![Online classroom app in React with a shared whiteboard, live video rail and class controls](docs/screenshots/classroom-desktop.png)
 
 </div>
 
@@ -97,7 +95,7 @@ Mode is picked when the room is created and fixed for its lifetime. The layout f
 
 - Node 20 or newer (developed on Node 24)
 - pnpm 9 or newer
-- A [VideoSDK account](https://app.videosdk.live) for the API key and secret. The free tier is 10,000 minutes a month
+- A [VideoSDK account](https://app.videosdk.live) for the API key and secret. New accounts start with $20 in free credit
 - A [Supabase](https://supabase.com) project for auth and the room table
 
 ### Environment
@@ -208,7 +206,7 @@ This split is the pattern most real-time apps land on: cheap, low-latency broadc
 - [Whiteboard guide](https://docs.videosdk.live/react/guide/video-and-audio-calling-api-sdk/collaboration-in-meeting/whiteboard)
 - [`useWhiteboard` reference](https://docs.videosdk.live/react/api/sdk-reference/use-whiteboard)
 - [Authentication and tokens](https://docs.videosdk.live/react/guide/video-and-audio-calling-api-sdk/authentication-and-token)
-- [Get an API key](https://app.videosdk.live) - 10,000 free minutes a month
+- [Get an API key](https://app.videosdk.live) - $20 in free credit to start
 
 ## Contributing
 

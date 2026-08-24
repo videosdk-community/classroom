@@ -173,6 +173,12 @@ export function fractionToPx(rect: BaseRect, fx: number, fy: number) {
 /** Whether the board has been squeezed past the point tldraw stays usable.
     Below this the shell should reclaim width from the side panel rather than
     keep shrinking the board. */
+/* Device-agnostic on purpose: this describes tldraw's own measured chrome
+   behaviour and the fixed 1280x720 recording composite, neither of which
+   changes based on who is looking at the board. A phone can never reach
+   BOARD_HARD_FLOOR_WIDTH - BoardStage's `warnOnSqueeze` prop is where that
+   gets handled, as presentation policy layered on this unchanged fact, not
+   by changing the measurement itself. */
 export function isBoardBelowFloor(rect: BaseRect) {
   return rect.width > 0 && rect.width < BOARD_HARD_FLOOR_WIDTH
 }

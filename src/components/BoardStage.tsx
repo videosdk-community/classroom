@@ -50,12 +50,27 @@ export interface BoardStageProps {
   /** Dev-only. Paints the regions tldraw's own furniture occupies, so app
       chrome can be checked against them rather than placed by eye. */
   showKeepout?: boolean
+  /** Whether the "this window is small" banner may show at all. Default true.
+
+      BOARD_HARD_FLOOR_WIDTH and isBoardBelowFloor are unchanged by this -
+      they still describe tldraw's own measured behaviour, not a policy. This
+      only gates the banner built on top of them. A phone can never reach
+      800px, so the banner's own text ("make your window bigger") is never
+      actionable there - the caller passes false for phone rather than this
+      component guessing from its own width. */
+  warnOnSqueeze?: boolean
 }
 
-export function BoardStage({ url, overlay, canDraw, showKeepout = false }: BoardStageProps) {
+export function BoardStage({
+  url,
+  overlay,
+  canDraw,
+  showKeepout = false,
+  warnOnSqueeze = true,
+}: BoardStageProps) {
   const boardOn = url !== null
   const { ref, rect } = useBaseRect()
-  const squeezed = isBoardBelowFloor(rect)
+  const squeezed = warnOnSqueeze && isBoardBelowFloor(rect)
 
   return (
     <div ref={ref} className="relative isolate h-full w-full">

@@ -55,19 +55,41 @@ const { startWhiteboard, stopWhiteboard, whiteboardUrl } = useWhiteboard();
 
 ## Screenshots
 
-| | |
-|---|---|
-| ![Classroom home screen showing the start-a-class control and a list of existing classes](docs/screenshots/home.png)<br>**Home.** One command line: type a title, pick a mode, start. Below it your classes and your recordings. An ended class keeps its link and offers Start again. | ![Precall device check screen with camera and microphone pickers before joining a class](docs/screenshots/precall.png)<br>**Precall.** Camera and mic get checked before anyone walks into the room, with a live level meter to prove the right microphone is the one that is listening. |
-| ![Student view of the read-only collaborative whiteboard in an online classroom](docs/screenshots/whiteboard-student.png)<br>**The student's board.** Read-only: no toolbar, no undo. The zoom menu still works, so a student can catch up to wherever the teacher drew. The teacher's cursor is labelled as it moves. | ![Teacher admitting a student from the online classroom lobby queue](docs/screenshots/lobby-knock.png)<br>**The lobby.** A student holding the weaker token cannot walk in. They knock, and the teacher admits or denies from the queue. |
-| ![Classroom chat panel beside the whiteboard, with a student's hand raised](docs/screenshots/chat-hands.png)<br>**Chat and raised hands.** Both ride persisted pubsub, so a student who joins late or reloads picks up the room as it stands. | ![Cloud recording of the class playing back with the whiteboard and named cursors composited in](docs/screenshots/recordings.png)<br>**The recording includes the board.** Ink, live cursors with name tags, and participant tiles, all composited. Owner-only list with a player and a download link. |
+**Home.** One command line: type a title, pick a mode, start. Below it your classes and your recordings. An ended class keeps its link and offers Start again.
+
+![Classroom home screen showing the start-a-class control and a list of existing classes](docs/screenshots/home.png)
+
+**Precall.** Camera and mic get checked before anyone walks into the room, with a live level meter to prove the right microphone is the one that is listening.
+
+![Precall device check screen with camera and microphone pickers before joining a class](docs/screenshots/precall.png)
+
+**The student's board.** Read-only: no toolbar, no undo. The zoom menu still works, so a student can catch up to wherever the teacher drew. The teacher's cursor is labelled as it moves.
+
+![Student view of the read-only collaborative whiteboard in an online classroom](docs/screenshots/whiteboard-student.png)
+
+**The lobby.** A student holding the weaker token cannot walk in. They knock, and the teacher admits or denies from the queue.
+
+![Teacher admitting a student from the online classroom lobby queue](docs/screenshots/lobby-knock.png)
+
+**Chat and raised hands.** Both ride persisted pubsub, so a student who joins late or reloads picks up the room as it stands.
+
+![Classroom chat panel beside the whiteboard, with a student's hand raised](docs/screenshots/chat-hands.png)
+
+**The recording includes the board.** Ink, live cursors with name tags, and participant tiles, all composited. Owner-only list with a player and a download link.
+
+![Cloud recording of the class playing back with the whiteboard and named cursors composited in](docs/screenshots/recordings.png)
 
 ### Class and Lecture
 
 Mode is picked when the room is created and fixed for its lifetime. The layout follows from it.
 
-| | |
-|---|---|
-| ![Class mode layout with every participant onstage in a video rail above the shared whiteboard](docs/screenshots/class-mode.png)<br>**Class.** Everyone is onstage, capped at 12 tiles with a `+N` chip for the rest. Made for a seminar where students are expected to talk. | ![Lecture mode layout with only the teacher onstage beside the whiteboard](docs/screenshots/lecture-mode.png)<br>**Lecture.** Only the teacher is onstage, and a student who needs to speak gets promoted. Everyone can still draw. Made for a room too big for a grid. |
+**Class.** Everyone is onstage, capped at 12 tiles with a `+N` chip for the rest. Made for a seminar where students are expected to talk.
+
+![Class mode layout with every participant onstage in a video rail above the shared whiteboard](docs/screenshots/class-mode.png)
+
+**Lecture.** Only the teacher is onstage, and a student who needs to speak gets promoted. Everyone can still draw. Made for a room too big for a grid.
+
+![Lecture mode layout with only the teacher onstage beside the whiteboard](docs/screenshots/lecture-mode.png)
 
 ## Installation
 

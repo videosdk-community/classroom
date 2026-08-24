@@ -1,4 +1,5 @@
 import { LiveTile } from './LiveTile'
+import { orderTiles } from '../lib/railOrder'
 
 /* The Class rail: everyone onstage, above the board.
 
@@ -21,10 +22,7 @@ export interface VideoRailProps {
 }
 
 export function VideoRail({ ids, selfId, teacherId, onSeeAll }: VideoRailProps) {
-  const pinned = [selfId, teacherId].filter((id): id is string => id !== null && ids.includes(id))
-  const ordered = [...new Set([...pinned, ...ids])]
-  const shown = ordered.slice(0, RAIL_CAP)
-  const hidden = ordered.length - shown.length
+  const { shown, hidden } = orderTiles(ids, [selfId, teacherId], RAIL_CAP)
 
   return (
     <div className="h-[112px] shrink-0 overflow-x-auto border-b border-line">

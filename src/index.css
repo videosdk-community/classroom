@@ -215,6 +215,22 @@
     animation: vsdk-rise var(--duration-slow) var(--ease-standard) both;
   }
 
+  /* BottomSheet's entrance. Slide only, no fade - the scrim already fades the
+     rest of the screen, and a sheet that also fades in reads as slower than
+     it is. */
+  @keyframes vsdk-sheet-slide-in {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .vsdk-sheet-slide-in {
+    animation: vsdk-sheet-slide-in 220ms var(--ease-standard) both;
+  }
+
   /* Skeleton shimmer. The one infinite animation in the app, and it only runs
      while real content is missing. */
   @keyframes vsdk-shimmer {

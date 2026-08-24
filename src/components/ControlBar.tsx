@@ -113,55 +113,46 @@ function DesktopControlBar({
   onLeave,
 }: ControlBarProps) {
   return (
-    <div className="relative flex h-16 shrink-0 items-center justify-center gap-2 border-t border-line px-3">
-      {/* Absolute, so the controls stay centred on the window rather than on
-          whatever is left after the title. */}
-      {meta && (
-        <div className="pointer-events-none absolute left-4 flex min-w-0 items-center gap-3">
-          {/* Tablet (md-lg) truncates rather than hides - a squeezed title
-              still says something, where an absent one says nothing. */}
-          <span className="hidden max-w-[120px] truncate text-base font-semibold text-ink md:block lg:max-w-none">
-            {meta.title}
-          </span>
-          <span className="hidden rounded-md bg-inset px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary md:inline lg:hidden">
-            {meta.mode.slice(0, 1)}
-          </span>
-          <span className="hidden rounded-md bg-inset px-2 py-0.5 text-xs uppercase tracking-wide text-ink-tertiary lg:inline">
-            {meta.mode}
-          </span>
-
-          {/* Never hidden at any width. A cold student named the absence of a
-              recording indicator as the thing that would stop them unmuting
-              or turning a camera on, and the recording genuinely does capture
-              the board, the ink and live cursors with name tags. */}
-          {meta.recording && (
-            <span
-              className="flex shrink-0 items-center gap-1.5 rounded-pill px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
-              style={{ background: 'var(--danger-bg)', color: 'var(--danger-fg)' }}
-            >
-              <RoomIcon name="record" size={11} />
-              Recording
+    <div className="relative flex h-16 shrink-0 items-center gap-2 border-t border-line px-3">
+      {/* A flex column, not an absolute overlay - the old version centred
+          the controls by taking the title out of flow entirely, which let a
+          long title run straight through the mic button the moment there
+          wasn't room for both. min-w-0 + truncate means this column loses
+          the fight for space instead of drawing on top of the buttons next
+          to it. */}
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+        {meta && (
+          <>
+            {/* Tablet (md-lg) truncates rather than hides - a squeezed title
+                still says something, where an absent one says nothing. */}
+            <span className="hidden max-w-[120px] truncate text-base font-semibold text-ink md:block lg:max-w-none">
+              {meta.title}
             </span>
-          )}
-        </div>
-      )}
+            <span className="hidden shrink-0 rounded-md bg-inset px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-ink-tertiary md:inline lg:hidden">
+              {meta.mode.slice(0, 1)}
+            </span>
+            <span className="hidden shrink-0 rounded-md bg-inset px-2 py-0.5 text-xs uppercase tracking-wide text-ink-tertiary lg:inline">
+              {meta.mode}
+            </span>
 
-      {/* The clock counts from the moment this participant mounted, not from
-          when the class actually started, because the SDK gives us no session
-          start time to anchor on. */}
-      {meta && (
-        <div className="pointer-events-none absolute right-4 hidden items-center gap-2 text-sm text-ink-tertiary sm:flex">
-          <span
-            className="h-1.5 w-1.5 rounded-pill"
-            style={{ background: 'var(--red-600)' }}
-          />
-          {/* "Live" drops on tablet - the dot plus the number is the part
-              that is actually load-bearing. */}
-          <span className="hidden font-medium text-ink-secondary lg:inline">Live</span>
-          {meta.elapsed}
-        </div>
-      )}
+            {/* Never hidden at any width. A cold student named the absence of a
+                recording indicator as the thing that would stop them unmuting
+                or turning a camera on, and the recording genuinely does capture
+                the board, the ink and live cursors with name tags. */}
+            {meta.recording && (
+              <span
+                className="flex shrink-0 items-center gap-1.5 rounded-pill px-2 py-0.5 text-xs font-semibold uppercase tracking-wide"
+                style={{ background: 'var(--danger-bg)', color: 'var(--danger-fg)' }}
+              >
+                <RoomIcon name="record" size={11} />
+                Recording
+              </span>
+            )}
+          </>
+        )}
+      </div>
 
+      <div className="flex shrink-0 items-center gap-2">
       <CtrlBtn
         label={micOn ? 'Mute yourself' : 'Unmute yourself'}
         off={!micOn}
@@ -316,6 +307,27 @@ function DesktopControlBar({
       >
         <RoomIcon name="phoneOff" size={18} />
       </CtrlBtn>
+      </div>
+
+      {/* The clock counts from the moment this participant mounted, not from
+          when the class actually started, because the SDK gives us no session
+          start time to anchor on. justify-end mirrors the title column on the
+          other side, so the two shrink symmetrically and the button row stays
+          centred. */}
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-hidden text-sm text-ink-tertiary whitespace-nowrap">
+        {meta && (
+          <div className="hidden items-center gap-2 sm:flex">
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-pill"
+              style={{ background: 'var(--red-600)' }}
+            />
+            {/* "Live" drops on tablet - the dot plus the number is the part
+                that is actually load-bearing. */}
+            <span className="hidden font-medium text-ink-secondary lg:inline">Live</span>
+            {meta.elapsed}
+          </div>
+        )}
+      </div>
 
       {moreOpen && isTeacher && (
         <div

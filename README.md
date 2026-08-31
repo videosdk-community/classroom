@@ -8,7 +8,7 @@
 
 [![Built on VideoSDK](https://img.shields.io/badge/built%20on-VideoSDK-9d7bff?style=flat-square)](https://videosdk.live) [![React 19](https://img.shields.io/badge/React-19-149eca?style=flat-square&logo=react&logoColor=white)](https://react.dev) [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org) [![Vite 8](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)](https://vite.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE) [![Live demo](https://img.shields.io/badge/live-demo-000000?style=flat-square&logo=vercel&logoColor=white)](https://classroom-by-videosdk.vercel.app)
 
-**[Live demo](https://classroom-by-videosdk.vercel.app) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Whiteboard docs](https://docs.videosdk.live/react/guide/video-and-audio-calling-api-sdk/collaboration-in-meeting/whiteboard)**
+**[Live demo](https://classroom-by-videosdk.vercel.app) · [Watch the video](https://youtu.be/hVXLhWCC9oM) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Whiteboard docs](https://docs.videosdk.live/react/guide/video-and-audio-calling-api-sdk/collaboration-in-meeting/whiteboard)**
 
 </div>
 
@@ -17,6 +17,10 @@
 A teacher opens a room, students knock to get in, and a shared whiteboard sits at the centre of the screen with live video, chat and hand-raising around it. Video, audio, chat, whiteboard, cloud recording and the lobby all come from VideoSDK. No second real-time vendor appears anywhere in the app.
 
 **[Try the live demo](https://classroom-by-videosdk.vercel.app)** or read on to run it yourself.
+
+## Video walkthrough
+
+[![Online classroom with React and VideoSDK - video walkthrough](https://img.youtube.com/vi/hVXLhWCC9oM/maxresdefault.jpg)](https://youtu.be/hVXLhWCC9oM)
 
 ## Why Classroom?
 

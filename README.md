@@ -1,4 +1,4 @@
-ƒ<div align="center">
+<div align="center">
 
 # Classroom
 

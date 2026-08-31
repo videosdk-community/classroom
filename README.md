@@ -1,4 +1,4 @@
-<div align="center">
+ƒ<div align="center">
 
 # Classroom
 
@@ -95,7 +95,7 @@ Mode is picked when the room is created and fixed for its lifetime. The layout f
 
 - Node 20 or newer (developed on Node 24)
 - pnpm 9 or newer
-- A [VideoSDK account](https://app.videosdk.live) for the API key and secret. New accounts start with $20 in free credit
+- A [VideoSDK account](https://dub.sh/X5Fn46e?utm_source=classroom-blog) for the API key and secret. New accounts start with $20 in free credit
 - A [Supabase](https://supabase.com) project for auth and the room table
 
 ### Environment

@@ -100,7 +100,7 @@ Mode is picked when the room is created and fixed for its lifetime. The layout f
 
 ### Environment
 
-Copy `.env.example` to `.env` and fill in five values.
+Copy `.env.example` to `.env` and fill in five values. The VideoSDK key and secret come from the [VideoSDK dashboard](https://dub.sh/X5Fn46e?utm_source=classroom_readme_env&utm_medium=github&utm_campaign=classroom).
 
 ```bash
 # Server-only. Never prefix these with VITE_.
